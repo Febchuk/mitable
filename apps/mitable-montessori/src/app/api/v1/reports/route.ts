@@ -1,3 +1,4 @@
+import { toddlerSendSnapshot } from "@/lib/reports/toddler-send-snapshot";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
@@ -300,7 +301,9 @@ export async function POST(req: Request) {
     input.kind === "Daily"
       ? await supabase
           .from("reports")
-          .select("id")
+          .select(
+            "id, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance"
+          )
           .eq("student_id", input.childId)
           .eq("classroom_id", reportClassroomId)
           .eq("report_type", "daily")
@@ -316,10 +319,13 @@ export async function POST(req: Request) {
       const { error: updateError } = await supabase
         .from("reports")
         .update({
-          sections,
-          section_meta: sectionMeta,
-          section_guidance: sectionGuidance,
-          toddler_daily_log_id: toddlerDailyLogId,
+          ...((await toddlerSendSnapshot(supabase, reusable)) ?? {
+            sections,
+            section_meta: sectionMeta,
+            section_guidance: sectionGuidance,
+            toddler_daily_log_id: toddlerDailyLogId,
+          }),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", reusable.id);
       if (updateError) {

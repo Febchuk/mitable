@@ -75,6 +75,7 @@ export function SenReportsFeature({
   );
   const [scores, setScores] = React.useState<Record<string, number>>({});
   const [remarks, setRemarks] = React.useState("");
+  const [includeDailyReport, setIncludeDailyReport] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -157,7 +158,11 @@ export function SenReportsFeature({
       const result = (await response.json()) as { ok?: boolean; id?: string; error?: string };
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Couldn't save SEN report");
       if (prepareToSend && result.id) {
-        const prepared = await fetch(`/api/v1/sen-reports/${result.id}/report`, { method: "POST" });
+        const prepared = await fetch(`/api/v1/sen-reports/${result.id}/report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ includeDailyReport }),
+        });
         const payload = await prepared.json();
         if (!prepared.ok) throw new Error(payload.error ?? "Couldn't prepare SEN report");
         router.push(`/app/reports/${payload.reportId}`);
@@ -179,11 +184,11 @@ export function SenReportsFeature({
   return (
     <div style={{ minHeight: "100%", background: "var(--color-canvas)" }}>
       <PageHeader
-        overline="Separate daily record"
+        overline="Daily learning and support"
         title="SEN reports"
         subtitle={
           data?.group
-            ? `${data.group.name} · kept separate from class progress.`
+            ? `${data.group.name} · prepare one report for families.`
             : "Daily SEN reporting."
         }
         actions={
@@ -312,6 +317,15 @@ export function SenReportsFeature({
             </aside>
 
             <main style={{ display: "grid", gap: 18, minWidth: 0 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={includeDailyReport}
+                  disabled={saving}
+                  onChange={(event) => setIncludeDailyReport(event.target.checked)}
+                />
+                Include daily activity and progress in the same report
+              </label>
               <section
                 style={{
                   padding: 16,
