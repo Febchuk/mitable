@@ -10,6 +10,7 @@ const UpsertTermCommentSchema = z.object({
   studentId: z.string().uuid(),
   termId: z.string().uuid(),
   comment: z.string().trim().max(4000).nullable(),
+  overallGradeLabel: z.enum(["A", "B", "C", "D"]).nullable().optional(),
 });
 
 async function validateScope(args: {
@@ -93,8 +94,22 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   const comment = input.comment?.trim() || null;
+  let overallGradeLabel = input.overallGradeLabel;
+  if (overallGradeLabel === undefined) {
+    const { data: previous, error } = await admin
+      .from("elementary_term_grade_comments")
+      .select("overall_grade_label")
+      .eq("school_id", auth.user.schoolId)
+      .eq("classroom_id", input.classroomId)
+      .eq("student_id", input.studentId)
+      .eq("term_id", input.termId)
+      .maybeSingle();
+    if (error)
+      return NextResponse.json({ error: "Could not load existing term feedback" }, { status: 500 });
+    overallGradeLabel = (previous?.overall_grade_label as "A" | "B" | "C" | "D" | null) ?? null;
+  }
 
-  if (!comment) {
+  if (!comment && !overallGradeLabel) {
     const { error } = await admin
       .from("elementary_term_grade_comments")
       .delete()
@@ -110,7 +125,8 @@ export async function POST(req: Request) {
         classroom_id: input.classroomId,
         student_id: input.studentId,
         term_id: input.termId,
-        comment,
+        comment: comment || "",
+        overall_grade_label: overallGradeLabel,
         recorded_by_user_id: auth.user.userId,
       },
       { onConflict: "term_id,classroom_id,student_id" }
@@ -127,8 +143,8 @@ export async function POST(req: Request) {
       classroom_id: input.classroomId,
       student_id: input.studentId,
       term_id: input.termId,
-      cleared: !comment,
+      cleared: !comment && !overallGradeLabel,
     },
   });
-  return NextResponse.json({ comment });
+  return NextResponse.json({ comment, overallGradeLabel });
 }

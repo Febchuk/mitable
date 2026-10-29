@@ -5,16 +5,41 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isElementaryClassroomCode } from "@/lib/app/active-classroom";
 import { auditLog } from "@/lib/audit/log";
 
-const UpsertGradeSchema = z.object({
-  id: z.string().uuid().optional(),
-  classroomId: z.string().uuid(),
-  studentId: z.string().uuid(),
-  termId: z.string().uuid(),
-  subject: z.string().trim().min(1).max(120),
-  assessmentName: z.string().trim().min(1).max(160),
-  percentage: z.number().min(0).max(100),
-  gradeLabel: z.string().trim().min(1).max(80),
-});
+const UpsertGradeSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    classroomId: z.string().uuid(),
+    studentId: z.string().uuid(),
+    termId: z.string().uuid(),
+    subject: z.string().trim().min(1).max(120),
+    assessmentName: z.string().trim().min(1).max(160),
+    percentage: z.number().finite().min(0).max(100).optional(),
+    gradeLabel: z.string().trim().max(80).optional().default(""),
+    caScore: z.number().finite().min(0).max(40).multipleOf(0.01).nullable().optional(),
+    classParticipationScore: z
+      .number()
+      .finite()
+      .min(0)
+      .max(20)
+      .multipleOf(0.01)
+      .nullable()
+      .optional(),
+    aflScore: z.number().finite().min(0).max(40).multipleOf(0.01).nullable().optional(),
+  })
+  .superRefine((input, ctx) => {
+    const components = [input.caScore, input.classParticipationScore, input.aflScore];
+    const count = components.filter((value) => value != null).length;
+    if (count !== 0 && count !== 3)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter CA, class participation and AFL together",
+      });
+    if (count === 0 && input.percentage == null)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter all three assessment scores or a total",
+      });
+  });
 
 async function validateScope(args: {
   schoolId: string;
@@ -105,8 +130,14 @@ export async function POST(req: Request) {
     term_id: input.termId,
     subject: input.subject,
     assessment_name: input.assessmentName,
-    percentage: input.percentage,
-    grade_label: input.gradeLabel,
+    percentage:
+      input.caScore != null && input.classParticipationScore != null && input.aflScore != null
+        ? Math.round((input.caScore + input.classParticipationScore + input.aflScore) * 100) / 100
+        : input.percentage!,
+    grade_label: input.caScore != null ? "" : input.gradeLabel,
+    ca_score: input.caScore ?? null,
+    class_participation_score: input.classParticipationScore ?? null,
+    afl_score: input.aflScore ?? null,
     comments: null,
     recorded_by_user_id: auth.user.userId,
   };
@@ -116,12 +147,15 @@ export async function POST(req: Request) {
         .update(values)
         .eq("id", input.id)
         .eq("school_id", auth.user.schoolId)
+        .eq("classroom_id", input.classroomId)
+        .eq("student_id", input.studentId)
+        .eq("term_id", input.termId)
     : admin
         .from("elementary_exam_grades")
         .upsert(values, { onConflict: "term_id,student_id,subject,assessment_name" });
   const { data, error } = await mutation
     .select(
-      "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, comments, updated_at"
+      "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, ca_score, class_participation_score, afl_score, comments, updated_at"
     )
     .single();
   if (error || !data)
@@ -146,6 +180,10 @@ export async function POST(req: Request) {
       subject: data.subject,
       assessmentName: data.assessment_name,
       percentage: Number(data.percentage),
+      caScore: data.ca_score == null ? null : Number(data.ca_score),
+      classParticipationScore:
+        data.class_participation_score == null ? null : Number(data.class_participation_score),
+      aflScore: data.afl_score == null ? null : Number(data.afl_score),
       gradeLabel: data.grade_label,
       comments: data.comments,
       updatedAt: data.updated_at,

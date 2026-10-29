@@ -20,6 +20,9 @@ export type ElementaryExamGrade = {
   subject: string;
   assessmentName: string;
   percentage: number;
+  caScore?: number | null;
+  classParticipationScore?: number | null;
+  aflScore?: number | null;
   gradeLabel: string;
   comments: string | null;
   updatedAt: string;
@@ -30,6 +33,7 @@ export type ElementaryTermGradeComment = {
   studentId: string;
   termId: string;
   comment: string;
+  overallGradeLabel?: string | null;
 };
 
 export type ElementaryGradesPageData = {
@@ -69,14 +73,14 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
     admin
       .from("elementary_exam_grades")
       .select(
-        "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, comments, updated_at"
+        "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, ca_score, class_participation_score, afl_score, comments, updated_at"
       )
       .eq("school_id", ctx.schoolId)
       .in("classroom_id", classroomIds)
       .order("subject"),
     admin
       .from("elementary_term_grade_comments")
-      .select("classroom_id, student_id, term_id, comment")
+      .select("classroom_id, student_id, term_id, comment, overall_grade_label")
       .eq("school_id", ctx.schoolId)
       .in("classroom_id", classroomIds),
   ]);
@@ -130,6 +134,10 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
         subject: row.subject as string,
         assessmentName: row.assessment_name as string,
         percentage: Number(row.percentage),
+        caScore: row.ca_score == null ? null : Number(row.ca_score),
+        classParticipationScore:
+          row.class_participation_score == null ? null : Number(row.class_participation_score),
+        aflScore: row.afl_score == null ? null : Number(row.afl_score),
         gradeLabel: row.grade_label as string,
         comments: (row.comments as string | null) ?? null,
         updatedAt: row.updated_at as string,
@@ -142,6 +150,7 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
         studentId: row.student_id as string,
         termId: row.term_id as string,
         comment: row.comment as string,
+        overallGradeLabel: (row.overall_grade_label as string | null) ?? null,
       };
     }),
   };
@@ -157,7 +166,7 @@ export async function listStudentExamGradesForTerm(args: {
   const { data, error } = await admin
     .from("elementary_exam_grades")
     .select(
-      "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, comments, updated_at"
+      "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, ca_score, class_participation_score, afl_score, comments, updated_at"
     )
     .eq("school_id", args.schoolId)
     .eq("classroom_id", args.classroomId)
@@ -176,6 +185,10 @@ export async function listStudentExamGradesForTerm(args: {
       subject: row.subject as string,
       assessmentName: row.assessment_name as string,
       percentage: Number(row.percentage),
+      caScore: row.ca_score == null ? null : Number(row.ca_score),
+      classParticipationScore:
+        row.class_participation_score == null ? null : Number(row.class_participation_score),
+      aflScore: row.afl_score == null ? null : Number(row.afl_score),
       gradeLabel: row.grade_label as string,
       comments: (row.comments as string | null) ?? null,
       updatedAt: row.updated_at as string,
@@ -183,22 +196,31 @@ export async function listStudentExamGradesForTerm(args: {
   });
 }
 
-export async function getStudentTermGradeComment(args: {
+export async function getStudentTermGradeFeedback(args: {
   schoolId: string;
   classroomId: string;
   studentId: string;
   termId: string;
-}): Promise<string | null> {
+}): Promise<{ comment: string | null; overallGradeLabel: string | null }> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("elementary_term_grade_comments")
-    .select("comment")
+    .select("comment, overall_grade_label")
     .eq("school_id", args.schoolId)
     .eq("classroom_id", args.classroomId)
     .eq("student_id", args.studentId)
     .eq("term_id", args.termId)
     .maybeSingle();
   if (error && !isMissingTermCommentsTable(error)) throw new Error(error.message);
-  if (isMissingTermCommentsTable(error)) return null;
-  return (data?.comment as string | null | undefined) ?? null;
+  if (isMissingTermCommentsTable(error)) return { comment: null, overallGradeLabel: null };
+  return {
+    comment: (data?.comment as string | null | undefined) || null,
+    overallGradeLabel: (data?.overall_grade_label as string | null | undefined) ?? null,
+  };
+}
+
+export async function getStudentTermGradeComment(
+  args: Parameters<typeof getStudentTermGradeFeedback>[0]
+) {
+  return (await getStudentTermGradeFeedback(args)).comment;
 }
