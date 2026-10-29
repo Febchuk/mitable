@@ -8,6 +8,7 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
     const filters: Array<(row: Row) => boolean> = [];
     const orders: Array<{ key: string; ascending: boolean }> = [];
     let maximum = Infinity;
+    let start = 0;
     let operation = "select";
     let payload: Row | Row[] = {};
     let conflictKeys: string[] = [];
@@ -43,7 +44,7 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
             String(value(a, key) ?? "").localeCompare(String(value(b, key) ?? "")) *
             (ascending ? 1 : -1)
         );
-      return { data: data.slice(0, maximum), error: null };
+      return { data: data.slice(start, start + maximum), error: null };
     };
     const q = {
       select: () => q,
@@ -74,6 +75,11 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
       },
       limit: (count: number) => {
         maximum = count;
+        return q;
+      },
+      range: (from: number, to: number) => {
+        start = from;
+        maximum = to - from + 1;
         return q;
       },
       update: (patch: Row) => {
