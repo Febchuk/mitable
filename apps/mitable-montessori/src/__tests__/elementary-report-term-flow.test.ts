@@ -207,3 +207,31 @@ it("shows a source-read failure instead of an empty grades section", async () =>
   fixture.failures.set("elementary_exam_grades", "Grades unavailable");
   await expect(getReport(String(report.id))).rejects.toThrow("Grades unavailable");
 });
+
+it("honors an explicit end-of-term selection with a legacy template period", async () => {
+  await saveResults();
+  const templateId = "77777777-7777-4777-8777-777777777777";
+  fixture.tables.report_templates = [
+    {
+      id: templateId,
+      school_id: "school",
+      kind: "Major",
+      reporting_period: "daily",
+      sections: ["Teacher notes"],
+      section_meta: {},
+      section_guidance: {},
+    },
+  ];
+  const response = await create(req({ childId: CHILD, kind: "Major", templateId, termId: FUTURE }));
+  expect(response.status).toBe(200);
+  expect(fixture.tables.reports[0]).toMatchObject({
+    reporting_period: "end_of_term",
+    term_id: FUTURE,
+    period_start: "2027-01-11",
+    period_end: "2027-03-27",
+  });
+  expect(summary(fixture.tables.reports[0])).toEqual({
+    averagePercentage: 90,
+    comment: "A strong term.",
+  });
+});

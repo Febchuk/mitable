@@ -256,7 +256,7 @@ export async function POST(req: Request) {
   });
   const reportDate = input.reportDate ?? reportDay.toISOString().slice(0, 10);
 
-  if (input.kind === "Major" && !reportingPeriod) reportingPeriod = "end_of_term";
+  if (input.kind === "Major" && (!reportingPeriod || selectedTerm)) reportingPeriod = "end_of_term";
   let { periodStart, periodEnd, termId } = reportingPeriod
     ? await resolvePeriodBounds(
         supabase,

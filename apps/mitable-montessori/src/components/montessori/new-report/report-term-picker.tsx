@@ -40,7 +40,7 @@ export function ReportTermPicker({
     };
   }, [retry]);
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 16, minWidth: 0 }}>
       <p style={{ color: "var(--color-ink-secondary)", fontSize: 14, margin: 0 }}>
         Choose the same term used on the Grades screen. The report will include that term’s grades,
         comment and progress.
@@ -67,6 +67,8 @@ export function ReportTermPicker({
             disabled={submitting}
             onChange={(event) => setTermId(event.target.value)}
             style={{
+              minWidth: 0,
+              width: "100%",
               padding: "12px",
               border: "1px solid var(--color-border)",
               borderRadius: 9,
