@@ -1,4 +1,5 @@
 import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
+import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
@@ -120,6 +121,20 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   let templateSections: { heading: string; guidance: string }[] = [];
   let writingStyle = "";
   let templateSectionMeta: SectionMeta = {};
+  if (report.report_type === "major") {
+    const built = await buildTermHistorySections(supabase, {
+      schoolId: auth.user.schoolId,
+      studentId: report.student_id,
+      periodStart: report.period_start || report.report_date,
+      periodEnd: report.period_end || report.report_date,
+    });
+    const merged = mergeTermHistory(
+      { sections: report.sections ?? [], sectionMeta: report.section_meta ?? {} },
+      built
+    );
+    report.sections = merged.sections;
+    report.section_meta = merged.sectionMeta;
+  }
   const storedSections = (report.sections as Array<{ heading: string }> | null) ?? [];
   const storedSectionMeta = (report.section_meta as SectionMeta | null) ?? {};
   const storedSectionGuidance = (report.section_guidance as Record<string, string> | null) ?? {};
@@ -261,6 +276,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       periodEnd,
       sections: seededSections,
       sectionMeta: templateSectionMeta,
+      reportingPeriod: report.report_type === "major" ? "end_of_term" : undefined,
     });
   }
 
@@ -273,6 +289,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const htmlForServerFilledSection = (heading: string): string =>
     seededSections.find((s) => s.heading === heading)?.paragraphs[0]?.html ?? "";
+  const paragraphsForTermHistory = (heading: string) =>
+    seededSections.find((section) => section.heading === heading)?.paragraphs ?? [];
 
   // Pre-flight: if there's no captured context for this student in the
   // period AND the client didn't supply transcripts/notes, the agent has
@@ -367,11 +385,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
               paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
           }
-          if (meta?.type === "exam_grades") {
+          if (meta?.type === "exam_grades" || meta?.type === "term_history") {
             return {
               id: `s-${i}-${slug}`,
               heading,
-              paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+              paragraphs:
+                meta.type === "term_history"
+                  ? paragraphsForTermHistory(heading)
+                  : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
           }
           return {
@@ -387,6 +408,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           .from("reports")
           .update({
             sections: editorSections,
+            section_meta: templateSectionMeta,
             body: concatenatedBody,
             updated_at: new Date().toISOString(),
           })
@@ -554,11 +576,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
-        if (meta?.type === "exam_grades") {
+        if (meta?.type === "exam_grades" || meta?.type === "term_history") {
           return {
             id: `s-${i}-${slug}`,
             heading,
-            paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+            paragraphs:
+              meta.type === "term_history"
+                ? paragraphsForTermHistory(heading)
+                : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
         return {
@@ -623,11 +648,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
-        if (cur?.type === "exam_grades") {
+        if (cur?.type === "exam_grades" || cur?.type === "term_history") {
           return {
             id: `s-${i}-${slug}`,
             heading,
-            paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
+            paragraphs:
+              cur.type === "term_history"
+                ? paragraphsForTermHistory(heading)
+                : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
         const s = agentResult!.draft.sections[agentIdx++];
@@ -659,9 +687,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       title?: string;
       sections: typeof editorSections;
       body: string;
+      section_meta: SectionMeta;
       updated_at: string;
     } = {
       sections: editorSections,
+      section_meta: templateSectionMeta,
       body: concatenatedBody,
       updated_at: new Date().toISOString(),
     };

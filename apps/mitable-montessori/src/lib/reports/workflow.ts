@@ -1,4 +1,5 @@
 import { elementaryGradeSnapshot } from "./elementary-grade-snapshot";
+import { termProgressSnapshot } from "./term-progress-snapshot";
 import { refreshBundledSenSections } from "./sen-bundle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReportReviewActionType, ReportStatus } from "@/lib/schemas/report";
@@ -57,7 +58,7 @@ async function applyTransition(
   const { data: report, error: readErr } = await ctx.supabase
     .from("reports")
     .select(
-      "id, status, report_type, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance, sen_daily_report_id, term_id"
+      "id, status, report_type, student_id, classroom_id, report_date, period_start, period_end, sections, section_meta, section_guidance, sen_daily_report_id, term_id"
     )
     .eq("id", ctx.reportId)
     .maybeSingle();
@@ -102,7 +103,12 @@ async function applyTransition(
   }
 
   if (action === "sent") {
-    const grades = await elementaryGradeSnapshot(ctx.supabase, report);
+    const progress = await termProgressSnapshot(ctx.supabase, report);
+    if (progress) Object.assign(update, progress);
+    const grades = await elementaryGradeSnapshot(ctx.supabase, {
+      ...report,
+      sections: progress?.sections ?? report.sections,
+    });
     if (grades) Object.assign(update, grades);
   }
 

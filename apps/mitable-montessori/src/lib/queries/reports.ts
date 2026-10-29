@@ -1,4 +1,5 @@
 import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
+import { termProgressSnapshot } from "@/lib/reports/term-progress-snapshot";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import type { SectionMeta } from "@/lib/report-templates/sections";
@@ -490,6 +491,8 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
     if (snapshot) row = { ...row, ...snapshot };
   }
   if (row.status !== "sent") {
+    const progress = await termProgressSnapshot(supabase, row);
+    if (progress) row = { ...row, ...progress };
     const grades = await elementaryGradeSnapshot(supabase, row);
     if (grades) row = { ...row, ...grades };
   }

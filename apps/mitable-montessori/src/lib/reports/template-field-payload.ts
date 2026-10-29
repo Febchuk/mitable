@@ -190,6 +190,7 @@ export function paragraphCountsTowardDraftReadiness(
     fieldMeta?.type === "hardcoded" ||
     fieldMeta?.type === "curriculum" ||
     fieldMeta?.type === "progress_topic" ||
+    fieldMeta?.type === "term_history" ||
     fieldMeta?.type === "exam_grades"
   ) {
     return false;
@@ -210,6 +211,7 @@ export function normalizeSectionHtmlForTemplate(
     entry.type === "hardcoded" ||
     entry.type === "curriculum" ||
     entry.type === "progress_topic" ||
+    entry.type === "term_history" ||
     entry.type === "exam_grades"
   ) {
     return html;
