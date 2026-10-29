@@ -1,3 +1,4 @@
+import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { getCurrentUserContext } from "@/lib/app/active-classroom";
 import type { SectionMeta } from "@/lib/report-templates/sections";
@@ -487,6 +488,10 @@ export async function getReport(id: string): Promise<ReportDetail | null> {
   if (row.report_type === "daily" && row.status !== "sent") {
     const snapshot = await toddlerSendSnapshot(supabase, { ...row, section_guidance: null });
     if (snapshot) row = { ...row, ...snapshot };
+  }
+  if (row.status !== "sent") {
+    const grades = await elementaryGradeSnapshot(supabase, row);
+    if (grades) row = { ...row, ...grades };
   }
   const tplJoin = row.report_templates;
   const reportSectionMeta = (row.section_meta as SectionMeta | null) ?? {};

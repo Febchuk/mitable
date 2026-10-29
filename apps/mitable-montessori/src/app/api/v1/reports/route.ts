@@ -27,6 +27,7 @@ import {
   resolveStudentClassroomId,
 } from "@/lib/reports/create-report-sections";
 import { endOfTermPeriodBounds } from "@/lib/reports/term-period";
+import { getSchoolTerm, type SchoolTerm } from "@/lib/queries/school-terms";
 import {
   getStudentTermGradeComment,
   listStudentExamGradesForTerm,
@@ -47,10 +48,17 @@ async function resolvePeriodBounds(
   supabase: ReturnType<typeof createAdminClient>,
   schoolId: string,
   reportingPeriod: ReportingPeriod,
-  today: Date
+  today: Date,
+  selectedTerm: SchoolTerm | null = null
 ): Promise<{ periodStart: string; periodEnd: string; termId: string | null }> {
   const periodEnd = today.toISOString().slice(0, 10);
   if (reportingPeriod === "end_of_term") {
+    if (selectedTerm)
+      return {
+        periodStart: selectedTerm.startDate,
+        periodEnd: selectedTerm.endDate,
+        termId: selectedTerm.id,
+      };
     const term = await endOfTermPeriodBounds(supabase, schoolId, today);
     return { periodStart: term.periodStart, periodEnd: term.periodEnd, termId: term.termId };
   }
@@ -80,6 +88,12 @@ export async function POST(req: Request) {
     );
   }
   const input = parsed.data;
+  if (input.termId && input.kind !== "Major") {
+    return NextResponse.json(
+      { error: "A term can only be selected for end-of-term reports" },
+      { status: 400 }
+    );
+  }
   if (input.reportDate && input.kind !== "Daily") {
     return NextResponse.json(
       { error: "A custom date is only available for Daily reports" },
@@ -99,6 +113,12 @@ export async function POST(req: Request) {
   // policy graph. We auth-gate via `requireUser` + verify the student
   // belongs to the caller's school explicitly below.
   const supabase = createAdminClient();
+  const selectedTerm = input.termId
+    ? await getSchoolTerm(supabase, auth.user.schoolId, input.termId)
+    : null;
+  if (input.termId && !selectedTerm) {
+    return NextResponse.json({ error: "Term not found in your school" }, { status: 400 });
+  }
 
   // Verify the picked student is in the caller's school. This is the
   // school-isolation guarantee that RLS would have given us.
@@ -179,7 +199,8 @@ export async function POST(req: Request) {
         supabase,
         auth.user.schoolId,
         reportingPeriod,
-        reportDay
+        reportDay,
+        selectedTerm
       );
       const built = await buildDefaultReportSections(supabase, {
         classroomId: reportClassroomId,
@@ -235,8 +256,15 @@ export async function POST(req: Request) {
   });
   const reportDate = input.reportDate ?? reportDay.toISOString().slice(0, 10);
 
+  if (input.kind === "Major" && !reportingPeriod) reportingPeriod = "end_of_term";
   let { periodStart, periodEnd, termId } = reportingPeriod
-    ? await resolvePeriodBounds(supabase, auth.user.schoolId, reportingPeriod, reportDay)
+    ? await resolvePeriodBounds(
+        supabase,
+        auth.user.schoolId,
+        reportingPeriod,
+        reportDay,
+        selectedTerm
+      )
     : { periodStart: reportDate, periodEnd: reportDate, termId: null };
 
   const reportClassroom = teacherClassrooms.find((classroom) => classroom.id === reportClassroomId);

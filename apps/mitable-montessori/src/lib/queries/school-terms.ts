@@ -15,6 +15,33 @@ export type SchoolTermPeriod = {
   periodEnd: string;
 };
 
+/** Match report defaults: current term, then latest started, then first future term. */
+export function defaultSchoolTermId(terms: SchoolTerm[], asOf: Date = new Date()): string | null {
+  const day = asOf.toISOString().slice(0, 10);
+  const ordered = [...terms].sort((a, b) => b.startDate.localeCompare(a.startDate));
+  return (
+    ordered.find((term) => term.startDate <= day && day <= term.endDate)?.id ??
+    ordered.find((term) => term.startDate <= day)?.id ??
+    ordered.at(-1)?.id ??
+    null
+  );
+}
+
+export async function getSchoolTerm(
+  supabase: SupabaseClient,
+  schoolId: string,
+  termId: string
+): Promise<SchoolTerm | null> {
+  const { data, error } = await supabase
+    .from("school_terms")
+    .select("id, name, start_date, end_date, sort_order")
+    .eq("school_id", schoolId)
+    .eq("id", termId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? rowToTerm(data as Record<string, unknown>) : null;
+}
+
 function rowToTerm(row: Record<string, unknown>): SchoolTerm {
   return {
     id: row.id as string,
