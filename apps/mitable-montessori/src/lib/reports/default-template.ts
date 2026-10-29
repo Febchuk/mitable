@@ -4,6 +4,7 @@ import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/secti
 import { type ReportingPeriod } from "@/lib/report-templates/admin-dto";
 import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import { REPORTABLE_PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
+import { schemaForStatus, PROGRESS_LEVELS } from "@/lib/progress/marking-schemas";
 import { encodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
 
 /** Legacy sentinel — still accepted when creating reports from old clients. */
@@ -241,27 +242,37 @@ async function loadClassroomSubjects(
     }));
 }
 
-/** Latest reportable mark per subtopic within the report window. */
+/** Daily views use the latest mark; term views retain the furthest level since the last clear. */
 async function loadPeriodProgressBySubtopic(
   supabase: SupabaseClient,
   studentId: string,
   periodStart: string,
   periodEnd: string,
-  exactWindow?: { start: string; end: string }
+  exactWindow?: { start: string; end: string },
+  furthest = false
 ): Promise<Map<string, { status: CurriculumStatus; comment: string | null }>> {
   const periodStartTime = exactWindow?.start ?? periodStart;
   const periodEndTime = exactWindow?.end ?? `${periodEnd}T23:59:59.999`;
-  const { data, error } = await supabase
-    .from("student_progress_history")
-    .select("curriculum_subtopic_id, new_status, comment, changed_at")
-    .eq("student_id", studentId)
-    .gte("changed_at", periodStartTime)
-    .lte("changed_at", periodEndTime)
-    .order("changed_at", { ascending: true });
-  if (error) throw new Error(error.message);
+  const rows: HistoryRow[] = [];
+  const size = 500;
+  for (let offset = 0; ; offset += size) {
+    const { data, error } = await supabase
+      .from("student_progress_history")
+      .select("curriculum_subtopic_id, new_status, comment, changed_at")
+      .eq("student_id", studentId)
+      .gte("changed_at", periodStartTime)
+      .lte("changed_at", periodEndTime)
+      .order("changed_at", { ascending: true })
+      .order("id")
+      .range(offset, offset + size - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as HistoryRow[];
+    rows.push(...page);
+    if (page.length < size) break;
+  }
 
   const out = new Map<string, { status: CurriculumStatus; comment: string | null }>();
-  for (const row of (data ?? []) as HistoryRow[]) {
+  for (const row of rows) {
     const status = row.new_status;
     if (!status) continue;
     if (!REPORTABLE_STATUSES.has(status as CurriculumStatus)) {
@@ -269,8 +280,17 @@ async function loadPeriodProgressBySubtopic(
       continue;
     }
     const comment = row.comment?.trim() || null;
+    const previous = out.get(row.curriculum_subtopic_id);
+    const schema = schemaForStatus(status as CurriculumStatus);
+    const keepPrevious =
+      furthest &&
+      previous &&
+      schema &&
+      schemaForStatus(previous.status) === schema &&
+      PROGRESS_LEVELS[schema].findIndex((level) => level.status === previous.status) <
+        PROGRESS_LEVELS[schema].findIndex((level) => level.status === status);
     out.set(row.curriculum_subtopic_id, {
-      status: status as CurriculumStatus,
+      status: keepPrevious ? previous.status : (status as CurriculumStatus),
       comment,
     });
   }
@@ -348,7 +368,8 @@ export async function buildDefaultReportSections(
       args.studentId,
       args.periodStart,
       args.periodEnd,
-      args.exactWindow
+      args.exactWindow,
+      reportingPeriod === "end_of_term"
     ),
   ]);
 
@@ -416,6 +437,7 @@ export async function refreshDefaultTemplateProgressSections(
     periodEnd: string;
     sections: ReportSection[];
     sectionMeta: SectionMeta;
+    reportingPeriod?: ReportingPeriod;
   }
 ): Promise<ReportSection[]> {
   const subjects = await loadClassroomSubjects(supabase, args.classroomId);
@@ -424,7 +446,9 @@ export async function refreshDefaultTemplateProgressSections(
     supabase,
     args.studentId,
     args.periodStart,
-    args.periodEnd
+    args.periodEnd,
+    undefined,
+    args.reportingPeriod === "end_of_term"
   );
 
   return args.sections.map((section) => {
