@@ -14,6 +14,7 @@ export function firstOpenParagraphIndex(
         fieldMeta.type === "progress_topic" ||
         fieldMeta.type === "term_history" ||
         fieldMeta.type === "term_skills" ||
+        fieldMeta.type === "director_comment" ||
         fieldMeta.type === "exam_grades" ||
         fieldMeta.type === "checklist" ||
         fieldMeta.type === "single_select";

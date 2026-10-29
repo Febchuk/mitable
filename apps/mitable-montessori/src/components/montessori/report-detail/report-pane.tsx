@@ -23,6 +23,7 @@ import { Bolt } from "./icons";
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 import { TermSkillsField } from "./term-skills-field";
 import { ExamGradeSummary } from "@/components/montessori/exam-grade-summary";
+import { isDirectorComment } from "@/lib/reports/director-comment";
 
 const COMING_SOON = "Editing this section is coming soon — chat assistant will land first.";
 const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
@@ -31,6 +32,7 @@ type ReportPaneProps = {
   detail: ReportDetail;
   onChange: (next: ReportDetail) => void;
   plainTextEditing?: boolean;
+  canEditDirectorComment?: boolean;
   /** True while POST /draft is filling the report from capture — blocks edits on this pane only. */
   isDrafting?: boolean;
   /** Aborts the in-flight /draft request (client-side); optional for tests. */
@@ -56,6 +58,7 @@ export function ReportPane({
   detail,
   onChange,
   plainTextEditing = false,
+  canEditDirectorComment = false,
   isDrafting = false,
   onCancelDrafting,
   onDiscussParagraph,
@@ -180,6 +183,7 @@ export function ReportPane({
                 section={group.section}
                 plainTextEditing={plainTextEditing}
                 fieldMeta={sectionMeta[group.section.heading]}
+                canEditDirectorComment={canEditDirectorComment}
                 pendingFocusParagraphId={pendingFocusParagraphId}
                 onParagraphFocused={clearPendingFocus}
                 onParagraphCommit={(paragraphId, html) =>
@@ -699,6 +703,7 @@ function SectionBlock({
   section,
   plainTextEditing = false,
   fieldMeta,
+  canEditDirectorComment = false,
   pendingFocusParagraphId,
   onParagraphFocused,
   onParagraphCommit,
@@ -711,6 +716,7 @@ function SectionBlock({
   section: ReportSection;
   plainTextEditing?: boolean;
   fieldMeta?: SectionMetaEntry;
+  canEditDirectorComment?: boolean;
   pendingFocusParagraphId: string | null;
   onParagraphFocused: () => void;
   onParagraphCommit: (paragraphId: string, html: string) => void;
@@ -724,14 +730,18 @@ function SectionBlock({
   const [confirmingDeleteParagraphId, setConfirmingDeleteParagraphId] = React.useState<
     string | null
   >(null);
-  const showGhost = !!section.ghostEdit;
+  const directorSection = isDirectorComment(section.heading, fieldMeta);
+  const showGhost = !!section.ghostEdit && !directorSection;
   const ghostOpenParagraphIndex = showGhost
     ? firstOpenParagraphIndex(section.paragraphs, fieldMeta)
     : null;
   const radioGroupName = React.useId();
   const dailyLogSection = section.heading.trim().toLowerCase() === "daily log";
   const lockedSection =
-    fieldMeta?.type === "exam_grades" || fieldMeta?.type === "term_history" || dailyLogSection;
+    fieldMeta?.type === "exam_grades" ||
+    fieldMeta?.type === "term_history" ||
+    dailyLogSection ||
+    directorSection;
 
   return (
     <div className="rd-section">
@@ -799,13 +809,14 @@ function SectionBlock({
             fieldMeta.type === "term_skills");
         const serverFilledFirst =
           paraIndex === 0 &&
-          (dailyLogSection ||
+          (directorSection ||
+            dailyLogSection ||
             fieldMeta?.type === "hardcoded" ||
             fieldMeta?.type === "curriculum" ||
             fieldMeta?.type === "progress_topic" ||
             fieldMeta?.type === "term_history" ||
             fieldMeta?.type === "exam_grades");
-        const hideParagraphDelete = structuredFirst || serverFilledFirst;
+        const hideParagraphDelete = structuredFirst || serverFilledFirst || directorSection;
 
         return (
           <div className="rd-para-block" key={p.id}>
@@ -842,7 +853,7 @@ function SectionBlock({
                 </span>
               ) : (
                 <>
-                  {!serverFilledFirst ? (
+                  {!serverFilledFirst && !directorSection ? (
                     <button
                       type="button"
                       className="rd-para-action"
@@ -873,7 +884,26 @@ function SectionBlock({
                 </>
               )}
             </div>
-            {structuredFirst && fieldMeta.type === "term_skills" ? (
+            {directorSection ? (
+              canEditDirectorComment ? (
+                <textarea
+                  className="rd-para-text rd-para-textarea"
+                  aria-label="Director's comment"
+                  placeholder="Add the director's end-of-term comment"
+                  value={fieldPayloadToReadableText(p.html)}
+                  maxLength={4000}
+                  rows={5}
+                  onChange={(event) =>
+                    onParagraphCommit(p.id, plainTextToReportParagraphHtml(event.target.value))
+                  }
+                />
+              ) : (
+                <p className="rd-para-text whitespace-pre-wrap" aria-label="Director's comment">
+                  {fieldPayloadToReadableText(p.html) ||
+                    "The director adds this comment during review."}
+                </p>
+              )
+            ) : structuredFirst && fieldMeta.type === "term_skills" ? (
               <TermSkillsField html={p.html} onCommit={(next) => onParagraphCommit(p.id, next)} />
             ) : structuredFirst && fieldMeta.type === "checklist" ? (
               <TemplateChecklistField

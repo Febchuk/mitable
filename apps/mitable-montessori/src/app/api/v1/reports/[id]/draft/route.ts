@@ -1,6 +1,7 @@
 import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
 import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
 import { termSkillsSection } from "@/lib/reports/term-skills";
+import { withDirectorComment } from "@/lib/reports/director-comment";
 import { isElementaryClassroomCode } from "@/lib/app/active-classroom";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -61,7 +62,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { data: report, error: readErr } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, term_id, period_start, period_end, report_date, status, template_id, sections, section_meta, section_guidance, students!inner(school_id, first_name, last_name, preferred_name)"
+      "id, student_id, classroom_id, report_type, term_id, period_start, period_end, report_date, status, updated_at, template_id, sections, section_meta, section_guidance, students!inner(school_id, first_name, last_name, preferred_name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -148,7 +149,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       report.sections.push(termSkillsSection());
       report.section_meta["Skills report"] = { type: "term_skills" };
     }
+    const withDirector = withDirectorComment(report.sections, report.section_meta);
+    report.sections = withDirector.sections;
+    report.section_meta = withDirector.sectionMeta;
   }
+  // Generation can take time: never overwrite a review or send that landed meanwhile.
+  const persistDraft = (values: Record<string, unknown>) => {
+    let mutation = supabase.from("reports").update(values).eq("id", id).eq("status", "draft");
+    if (report.updated_at) mutation = mutation.eq("updated_at", report.updated_at);
+    return mutation.select("id").maybeSingle();
+  };
+  const changedWhileDrafting = () =>
+    NextResponse.json(
+      { error: "This report changed while generating. Reload it before trying again." },
+      { status: 409 }
+    );
   const storedSections = (report.sections as Array<{ heading: string }> | null) ?? [];
   const storedSectionMeta = (report.section_meta as SectionMeta | null) ?? {};
   const storedSectionGuidance = (report.section_guidance as Record<string, string> | null) ?? {};
@@ -303,7 +318,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const htmlForServerFilledSection = (heading: string): string =>
     seededSections.find((s) => s.heading === heading)?.paragraphs[0]?.html ?? "";
-  const paragraphsForTermHistory = (heading: string) =>
+  const paragraphsForManualSection = (heading: string) =>
     seededSections.find((section) => section.heading === heading)?.paragraphs ?? [];
 
   // Pre-flight: if there's no captured context for this student in the
@@ -402,14 +417,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           if (
             meta?.type === "exam_grades" ||
             meta?.type === "term_history" ||
-            meta?.type === "term_skills"
+            meta?.type === "term_skills" ||
+            meta?.type === "director_comment"
           ) {
             return {
               id: `s-${i}-${slug}`,
               heading,
               paragraphs:
-                meta.type === "term_history" || meta.type === "term_skills"
-                  ? paragraphsForTermHistory(heading)
+                meta.type === "term_history" ||
+                meta.type === "term_skills" ||
+                meta.type === "director_comment"
+                  ? paragraphsForManualSection(heading)
                   : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
           }
@@ -422,15 +440,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         const concatenatedBody = editorSections
           .map((s) => `# ${s.heading}\n\n${s.paragraphs.map((p) => p.html).join("\n\n")}`)
           .join("\n\n");
-        const { error: skipUpdErr } = await supabase
-          .from("reports")
-          .update({
-            sections: editorSections,
-            section_meta: templateSectionMeta,
-            body: concatenatedBody,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", id);
+        const { data: savedSkip, error: skipUpdErr } = await persistDraft({
+          sections: editorSections,
+          section_meta: templateSectionMeta,
+          body: concatenatedBody,
+          updated_at: new Date().toISOString(),
+        });
+        if (!skipUpdErr && !savedSkip) return changedWhileDrafting();
         if (!skipUpdErr) {
           const { data: freshSkip, error: freshSkipErr } = await supabase
             .from("reports")
@@ -597,14 +613,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         if (
           meta?.type === "exam_grades" ||
           meta?.type === "term_history" ||
-          meta?.type === "term_skills"
+          meta?.type === "term_skills" ||
+          meta?.type === "director_comment"
         ) {
           return {
             id: `s-${i}-${slug}`,
             heading,
             paragraphs:
-              meta.type === "term_history" || meta.type === "term_skills"
-                ? paragraphsForTermHistory(heading)
+              meta.type === "term_history" ||
+              meta.type === "term_skills" ||
+              meta.type === "director_comment"
+                ? paragraphsForManualSection(heading)
                 : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
@@ -673,14 +692,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         if (
           cur?.type === "exam_grades" ||
           cur?.type === "term_history" ||
-          cur?.type === "term_skills"
+          cur?.type === "term_skills" ||
+          cur?.type === "director_comment"
         ) {
           return {
             id: `s-${i}-${slug}`,
             heading,
             paragraphs:
-              cur.type === "term_history" || cur.type === "term_skills"
-                ? paragraphsForTermHistory(heading)
+              cur.type === "term_history" ||
+              cur.type === "term_skills" ||
+              cur.type === "director_comment"
+                ? paragraphsForManualSection(heading)
                 : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
@@ -725,13 +747,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       updateRow.title = detokTitle;
     }
 
-    const { error: updateErr } = await supabase.from("reports").update(updateRow).eq("id", id);
+    const { data: savedDraft, error: updateErr } = await persistDraft(updateRow);
     if (updateErr) {
       return NextResponse.json(
         { error: "Failed to persist draft", details: updateErr.message },
         { status: 500 }
       );
     }
+    if (!savedDraft) return changedWhileDrafting();
 
     // Re-read the full row + student so the client can apply it directly.
     const { data: fresh, error: freshErr } = await supabase

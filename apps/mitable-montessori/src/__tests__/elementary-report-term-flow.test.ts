@@ -5,22 +5,29 @@ import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
 import { decodeProgressTopic } from "@/lib/reports/progress-topic-payload";
 import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
 import { encodeTermSkills, termSkillsForDisplay } from "@/lib/reports/term-skills";
+import { DIRECTOR_COMMENT_HEADING } from "@/lib/reports/director-comment";
 
-const mocks = vi.hoisted(() => ({ db: null as unknown, schoolId: "school", agent: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  db: null as unknown,
+  schoolId: "school",
+  agent: vi.fn(),
+  role: "teacher" as "teacher" | "admin",
+  classroomAllowed: true,
+}));
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => mocks.db }));
 vi.mock("@/lib/api/auth", () => ({
   requireUser: async () => ({
     ok: true,
-    user: { userId: "teacher", schoolId: mocks.schoolId, role: "teacher" },
+    user: { userId: "teacher", schoolId: mocks.schoolId, role: mocks.role },
   }),
-  requireTeacherForClassroom: async () => true,
+  requireTeacherForClassroom: async () => mocks.classroomAllowed,
 }));
 vi.mock("@/lib/app/active-classroom", async (original) => ({
   ...(await original<object>()),
   getCurrentUserContext: async () => ({
     userId: "teacher",
     schoolId: mocks.schoolId,
-    role: "teacher",
+    role: mocks.role,
   }),
   getActiveClassroomForCurrentUser: async () => ({ id: ROOM }),
   listTeacherClassroomsForCurrentUser: async () => [
@@ -50,6 +57,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-29T13:00:00Z"));
   mocks.schoolId = "school";
+  mocks.role = "teacher";
+  mocks.classroomAllowed = true;
   mocks.agent.mockReset();
   fixture = toddlerReportFixture();
   fixture.tables.classrooms[0].code = "Lower Elementary";
@@ -588,6 +597,10 @@ it("preserves teacher-marked skills when the writing assistant drafts the term's
     report.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>
   ).find((section) => section.heading === "Skills report")!;
   skills.paragraphs[0].html = encodeTermSkills({ "0-0": "Excellent" });
+  const director = (report.sections as (typeof skills)[]).find(
+    (section) => section.heading === DIRECTOR_COMMENT_HEADING
+  )!;
+  director.paragraphs[0].html = "The director's own review.";
   mocks.agent.mockResolvedValue({
     draft: {
       title: "Term report",
@@ -608,8 +621,156 @@ it("preserves teacher-marked skills when the writing assistant drafts the term's
   )!;
   expect(termSkillsForDisplay(saved.paragraphs[0].html)[0].rows[0].value).toBe("Excellent");
   expect(
+    (report.sections as (typeof skills)[]).find(
+      (section) => section.heading === DIRECTOR_COMMENT_HEADING
+    )?.paragraphs[0].html
+  ).toBe("The director's own review.");
+  expect(
     mocks.agent.mock.calls[0][0].templateSections.map(
       (section: { heading: string }) => section.heading
     )
   ).not.toContain("Skills report");
+  expect(
+    mocks.agent.mock.calls[0][0].templateSections.map(
+      (section: { heading: string }) => section.heading
+    )
+  ).not.toContain(DIRECTOR_COMMENT_HEADING);
 });
+
+type StoredSections = Array<{
+  id: string;
+  heading: string;
+  paragraphs: Array<{ id: string; html: string }>;
+}>;
+const patch = (id: string, body: unknown) =>
+  updateReport(
+    new Request("http://localhost/api", { method: "PATCH", body: JSON.stringify(body) }),
+    { params: Promise.resolve({ id }) }
+  );
+
+it("lets an admin add the director's comment separately and keeps it through reopen, regeneration and sending", async () => {
+  await saveResults();
+  const report = await createReport(FUTURE);
+  const sections = structuredClone(report.sections) as StoredSections;
+  const director = sections.find((section) => section.heading === DIRECTOR_COMMENT_HEADING)!;
+  expect(director.paragraphs[0].html).toBe("");
+  director.paragraphs[0].html = "A considered director review.";
+  report.status = "submitted_for_review";
+  mocks.role = "admin";
+  expect((await patch(String(report.id), { sections })).status).toBe(200);
+  expect(report.status).toBe("submitted_for_review");
+  expect(summary(report)?.comment).toBe("A strong term.");
+  expect(
+    (await getReport(String(report.id)))?.sections?.find(
+      (section) => section.heading === DIRECTOR_COMMENT_HEADING
+    )?.paragraphs[0].html
+  ).toBe("A considered director review.");
+  mocks.role = "teacher";
+  report.status = "draft";
+  expect(
+    (await regenerate(req({}), { params: Promise.resolve({ id: String(report.id) }) })).status
+  ).toBe(200);
+  expect(mocks.agent).not.toHaveBeenCalled();
+  await sendReport(
+    { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+    [],
+    {}
+  );
+  const blocks = buildReportPdfBlocks(
+    report.sections as Parameters<typeof buildReportPdfBlocks>[0],
+    report.section_meta as Parameters<typeof buildReportPdfBlocks>[1]
+  );
+  expect(blocks).toContainEqual({
+    kind: "section",
+    heading: DIRECTOR_COMMENT_HEADING,
+    paragraphs: [{ text: "A considered director review." }],
+  });
+  mocks.role = "admin";
+  expect((await patch(String(report.id), { sections })).status).toBe(409);
+});
+
+it.each(["edit", "delete", "rename"])(
+  "rejects a teacher trying to %s the director's comment",
+  async (action) => {
+    const report = await createReport(FUTURE);
+    const sections = structuredClone(report.sections) as StoredSections;
+    const index = sections.findIndex((section) => section.heading === DIRECTOR_COMMENT_HEADING);
+    if (action === "edit") sections[index].paragraphs[0].html = "Not written by the director.";
+    if (action === "delete") sections.splice(index, 1);
+    if (action === "rename") sections[index].heading = "Another heading";
+    expect((await patch(String(report.id), { sections })).status).toBe(403);
+    expect(
+      (report.sections as StoredSections).find(
+        (section) => section.heading === DIRECTOR_COMMENT_HEADING
+      )?.paragraphs[0].html
+    ).toBe("");
+  }
+);
+
+it("allows teacher ratings to change while keeping the director field and canonical body unchanged", async () => {
+  const report = await createReport(FUTURE);
+  const director = (report.sections as StoredSections).find(
+    (section) => section.heading === DIRECTOR_COMMENT_HEADING
+  )!;
+  director.paragraphs[0].html = "The director's saved review.";
+  const sections = structuredClone(report.sections) as StoredSections;
+  sections.find((section) => section.heading === "Skills report")!.paragraphs[0].html =
+    encodeTermSkills({ "0-0": "Adequate" });
+  expect(
+    (await patch(String(report.id), { sections, body: "A forged body-only director comment." }))
+      .status
+  ).toBe(200);
+  expect(report.body).toContain("The director's saved review.");
+  expect(report.body).not.toContain("forged");
+  expect((await patch(String(report.id), { body: "Another forged body." })).status).toBe(200);
+  expect(report.body).toContain("The director's saved review.");
+  expect(report.body).not.toContain("forged");
+});
+
+it("rejects edits from another school or a teacher no longer assigned to the classroom", async () => {
+  const report = await createReport(FUTURE);
+  mocks.classroomAllowed = false;
+  expect((await patch(String(report.id), { title: "Blocked" })).status).toBe(403);
+  mocks.role = "admin";
+  mocks.schoolId = "another-school";
+  expect((await patch(String(report.id), { title: "Blocked" })).status).toBe(403);
+});
+
+it.each(["save", "regenerate", "send-during-regeneration"])(
+  "does not overwrite a concurrent director review during %s",
+  async (operation) => {
+    const report = await createReport(FUTURE);
+    report.updated_at = "2026-10-29T12:00:00Z";
+    const sections = structuredClone(report.sections) as StoredSections;
+    mocks.db = new Proxy(fixture.db, {
+      get(target, prop) {
+        if (prop !== "from") return Reflect.get(target, prop);
+        return (table: string) => {
+          const query = target.from(table);
+          if (table === "reports") {
+            const update = query.update.bind(query);
+            query.update = ((values: unknown) => {
+              if (operation === "send-during-regeneration") report.status = "sent";
+              else report.updated_at = "2026-10-29T13:00:01Z";
+              (report.sections as StoredSections).find(
+                (section) => section.heading === DIRECTOR_COMMENT_HEADING
+              )!.paragraphs[0].html = "Concurrent director review.";
+              return update(values as never);
+            }) as typeof query.update;
+          }
+          return query;
+        };
+      },
+    });
+    const response =
+      operation === "save"
+        ? await patch(String(report.id), { sections })
+        : await regenerate(req({}), { params: Promise.resolve({ id: String(report.id) }) });
+    expect(response.status).toBe(409);
+    expect(
+      (report.sections as StoredSections).find(
+        (section) => section.heading === DIRECTOR_COMMENT_HEADING
+      )?.paragraphs[0].html
+    ).toBe("Concurrent director review.");
+  }
+);

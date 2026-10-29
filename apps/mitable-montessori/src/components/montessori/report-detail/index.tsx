@@ -874,6 +874,7 @@ export function ReportDetail({
             <div className={viewMode === "editor" ? "rd-pane-wrap" : "rd-pane-wrap rd-pane-hidden"}>
               <ReportPane
                 plainTextEditing={report.reportType === "project"}
+                canEditDirectorComment={isAdmin && report.status !== "sent"}
                 detail={detail}
                 onChange={onChange}
                 isDrafting={isDrafting}
