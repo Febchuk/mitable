@@ -103,7 +103,7 @@ export function defaultReportTemplateName(className: string, kind: ReportKind): 
 
 export function defaultReportTemplateDescription(kind: ReportKind): string {
   if (kind === "Daily") return "Progress marked in the last day";
-  if (kind === "Major") return "Progress since the current term started";
+  if (kind === "Major") return "Progress and grades for a school term";
   return "Describe what happened — we'll draft the incident report";
 }
 

@@ -8,6 +8,7 @@ import type {
   ElementaryExamGrade,
   ElementaryGradesPageData,
 } from "@/lib/queries/elementary-grades";
+import { defaultSchoolTermId } from "@/lib/queries/school-terms";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -41,7 +42,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
   const [grades, setGrades] = React.useState(initialData.grades);
   const [termComments, setTermComments] = React.useState(initialData.termComments);
   const [classroomId, setClassroomId] = React.useState(initialData.classrooms[0]?.id ?? "");
-  const [termId, setTermId] = React.useState(initialData.terms[0]?.id ?? "");
+  const [termId, setTermId] = React.useState(() => defaultSchoolTermId(initialData.terms) ?? "");
   const classroomStudents = initialData.students.filter((s) => s.classroomId === classroomId);
   const [selectedStudentId, setSelectedStudentId] = React.useState(classroomStudents[0]?.id ?? "");
   const [form, setForm] = React.useState<FormState>(emptyForm);
@@ -71,7 +72,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
 
   React.useEffect(() => {
     setTermComment(selectedTermComment?.comment ?? "");
-  }, [selectedTermComment?.comment]);
+  }, [classroomId, termId, selectedStudentId, selectedTermComment?.comment]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));

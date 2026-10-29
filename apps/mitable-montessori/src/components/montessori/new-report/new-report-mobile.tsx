@@ -6,10 +6,11 @@ import { initialsFor } from "../data";
 import { type PickerChild } from "./child-picker";
 import { IncidentCaptureStep } from "./incident-capture-step";
 import { ReportTypePicker } from "./report-type-picker";
+import { ReportTermPicker } from "./report-term-picker";
 import { buildBuiltinReportTemplateId } from "@/lib/reports/default-template";
 import { type NewReportPayload, type PickerReportKind as ReportKind } from "./mock-data";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 type CapturedToday = Record<string, { voice: number; photos: number }>;
 
 export function NewReportMobile({
@@ -54,11 +55,12 @@ export function NewReportMobile({
 
   if (!open) return null;
 
-  const submitPayload = (kind: ReportKind, incidentTranscript?: string) => {
+  const submitPayload = (kind: ReportKind, incidentTranscript?: string, termId?: string) => {
     if (!child) return;
     onSubmit({
       childId: child.id,
       kind,
+      termId,
       templateId:
         kind === "SEN"
           ? "__sen__"
@@ -92,6 +94,7 @@ export function NewReportMobile({
           onPick={(kind) => {
             setReportKind(kind);
             if (kind === "Incident") setStep(3);
+            else if (kind === "Major") setStep(4);
             else submitPayload(kind);
           }}
           submitting={submitting}
@@ -108,6 +111,31 @@ export function NewReportMobile({
             submitting={submitting}
           />
         </div>
+      )}
+      {step === 4 && child && (
+        <>
+          <div className="nr-m-head">
+            <button
+              type="button"
+              className="nr-m-iconbtn"
+              onClick={() => setStep(2)}
+              aria-label="Back to report type"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <span className="nr-m-title">End-of-term report</span>
+          </div>
+          <div className="nr-m-page-head">
+            <h1>Which term?</h1>
+            <p>For {child.name.split(" ")[0]}</p>
+          </div>
+          <div className="nr-m-body" style={{ padding: 20 }}>
+            <ReportTermPicker
+              submitting={submitting}
+              onContinue={(termId) => submitPayload("Major", undefined, termId)}
+            />
+          </div>
+        </>
       )}
     </div>
   );

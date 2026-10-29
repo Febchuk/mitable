@@ -6,11 +6,12 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { ChildPicker, type PickerChild } from "./child-picker";
 import { IncidentCaptureStep } from "./incident-capture-step";
 import { ReportTypePicker } from "./report-type-picker";
+import { ReportTermPicker } from "./report-term-picker";
 import { buildBuiltinReportTemplateId } from "@/lib/reports/default-template";
 import { type NewReportPayload, type PickerReportKind as ReportKind } from "./mock-data";
 
 type CapturedToday = Record<string, { voice: number; photos: number }>;
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 export function NewReportModal({
   open,
@@ -41,11 +42,12 @@ export function NewReportModal({
     }
   }, [open]);
 
-  const submitDailyOrTerm = () => {
+  const submitDailyOrTerm = (termId?: string) => {
     if (!child || !reportKind || reportKind === "Incident") return;
     onSubmit({
       childId: child.id,
       kind: reportKind,
+      termId,
       templateId:
         reportKind === "SEN"
           ? "__sen__"
@@ -69,6 +71,10 @@ export function NewReportModal({
     setReportKind(kind);
     if (kind === "Incident") {
       setStep(3);
+      return;
+    }
+    if (kind === "Major") {
+      setStep(4);
       return;
     }
     if (child) {
@@ -164,12 +170,40 @@ export function NewReportModal({
                   type="button"
                   className="nr-btn nr-btn-primary"
                   disabled={!reportKind || reportKind === "Incident" || submitting}
-                  onClick={submitDailyOrTerm}
+                  onClick={() => submitDailyOrTerm()}
                 >
                   {submitting ? "Starting…" : "Start report"}
                   <ArrowRight size={14} strokeWidth={2.5} />
                 </button>
               </footer>
+            </>
+          ) : step === 4 ? (
+            <>
+              <header className="nr-modal-head nr-modal-head--back">
+                <button
+                  type="button"
+                  className="nr-modal-back tap"
+                  onClick={() => setStep(2)}
+                  aria-label="Back to report type"
+                >
+                  <ArrowLeft size={16} strokeWidth={2} />
+                  <span>Back</span>
+                </button>
+                <div className="nr-modal-head-text">
+                  <DialogTitle className="font-display text-[1.35rem] font-medium leading-snug text-ink">
+                    End-of-term report
+                  </DialogTitle>
+                  <DialogDescription>
+                    Choose the report term for {child?.name.split(" ")[0]}.
+                  </DialogDescription>
+                </div>
+                <button type="button" className="nr-close tap" onClick={onClose} aria-label="Close">
+                  <X size={18} />
+                </button>
+              </header>
+              <div className="nr-modal-body scroll-quiet overflow-y-auto">
+                <ReportTermPicker onContinue={submitDailyOrTerm} submitting={submitting} />
+              </div>
             </>
           ) : (
             <IncidentCaptureStep

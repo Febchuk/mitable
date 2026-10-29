@@ -33,7 +33,7 @@ export const REPORT_TYPE_OPTIONS: ReportTypeOption[] = [
   {
     kind: "Major",
     label: "End-of-term",
-    description: "Progress since the current term started.",
+    description: "Progress and grades for a school term.",
     iconTone: "major",
   },
   {
