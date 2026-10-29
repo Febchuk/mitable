@@ -1,3 +1,4 @@
+import { elementaryGradeSnapshot } from "./elementary-grade-snapshot";
 import { refreshBundledSenSections } from "./sen-bundle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReportReviewActionType, ReportStatus } from "@/lib/schemas/report";
@@ -56,7 +57,7 @@ async function applyTransition(
   const { data: report, error: readErr } = await ctx.supabase
     .from("reports")
     .select(
-      "id, status, report_type, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance, sen_daily_report_id"
+      "id, status, report_type, student_id, classroom_id, report_date, period_end, sections, section_meta, section_guidance, sen_daily_report_id, term_id"
     )
     .eq("id", ctx.reportId)
     .maybeSingle();
@@ -98,6 +99,11 @@ async function applyTransition(
       sections: snapshot?.sections ?? report.sections,
     });
     if (bundled) update.sections = bundled;
+  }
+
+  if (action === "sent") {
+    const grades = await elementaryGradeSnapshot(ctx.supabase, report);
+    if (grades) Object.assign(update, grades);
   }
 
   const { error: updateErr } = await ctx.supabase

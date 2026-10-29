@@ -124,6 +124,7 @@ export function NewReportTrigger({
             childId: payload.childId,
             kind: payload.kind,
             templateId: payload.templateId,
+            termId: payload.termId,
             transcripts,
             notes: [],
             tokenMap: [],

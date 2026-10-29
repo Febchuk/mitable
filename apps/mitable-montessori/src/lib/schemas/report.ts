@@ -23,6 +23,7 @@ export type TokenMapEntry = z.infer<typeof TokenMapEntrySchema>;
 export const CreateReportRequestSchema = z.object({
   childId: z.string().uuid(),
   kind: ReportKind,
+  termId: z.string().uuid().optional(),
   templateId: z
     .string()
     .refine((id) => z.string().uuid().safeParse(id).success || isDefaultReportTemplateId(id), {

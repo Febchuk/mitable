@@ -35,6 +35,7 @@ export type NewReportPayload = {
   kind: PickerReportKind;
   /** Built-in sentinel or admin template uuid. */
   templateId: string;
+  termId?: string;
   /** Incident flow — voice transcript for the "What happened" section. */
   incidentTranscript?: string;
 };

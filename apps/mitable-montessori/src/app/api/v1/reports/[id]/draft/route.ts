@@ -1,3 +1,4 @@
+import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
@@ -57,7 +58,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { data: report, error: readErr } = await supabase
     .from("reports")
     .select(
-      "id, student_id, classroom_id, report_type, period_start, period_end, report_date, status, template_id, sections, section_meta, section_guidance, students!inner(school_id, first_name, last_name, preferred_name)"
+      "id, student_id, classroom_id, report_type, term_id, period_start, period_end, report_date, status, template_id, sections, section_meta, section_guidance, students!inner(school_id, first_name, last_name, preferred_name)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -262,6 +263,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       sectionMeta: templateSectionMeta,
     });
   }
+
+  const grades = await elementaryGradeSnapshot(supabase, {
+    ...report,
+    sections: seededSections,
+    section_meta: templateSectionMeta,
+  });
+  if (grades) seededSections = grades.sections;
 
   const htmlForServerFilledSection = (heading: string): string =>
     seededSections.find((s) => s.heading === heading)?.paragraphs[0]?.html ?? "";

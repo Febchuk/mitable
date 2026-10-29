@@ -10,16 +10,32 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
     let maximum = Infinity;
     let operation = "select";
     let payload: Row | Row[] = {};
+    let conflictKeys: string[] = [];
     const value = (row: Row, key: string): unknown =>
       key.split(".").reduce<unknown>((current, part) => (current as Row | null)?.[part], row);
     const execute = () => {
       if (failures.has(table)) return { data: null, error: { message: failures.get(table)! } };
       const rows = (tables[table] ??= []);
+      let upserted: Row[] | undefined;
       if (operation === "insert")
         rows.push(
           ...(Array.isArray(payload) ? payload : [{ id: crypto.randomUUID(), ...payload }])
         );
-      let data = rows.filter((row) => filters.every((filter) => filter(row)));
+      if (operation === "upsert") {
+        upserted = [];
+        for (const item of Array.isArray(payload) ? payload : [payload]) {
+          const existing = rows.find((row) => conflictKeys.every((key) => row[key] === item[key]));
+          if (existing) {
+            Object.assign(existing, item);
+            upserted.push(existing);
+          } else {
+            const inserted = { id: crypto.randomUUID(), ...item };
+            rows.push(inserted);
+            upserted.push(inserted);
+          }
+        }
+      }
+      let data = (upserted ?? rows).filter((row) => filters.every((filter) => filter(row)));
       if (operation === "update") data.forEach((row) => Object.assign(row, payload));
       for (const { key, ascending } of [...orders].reverse())
         data = [...data].sort(
@@ -68,6 +84,12 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
       insert: (row: Row | Row[]) => {
         operation = "insert";
         payload = row;
+        return q;
+      },
+      upsert: (row: Row | Row[], options: { onConflict: string }) => {
+        operation = "upsert";
+        payload = row;
+        conflictKeys = options.onConflict.split(",");
         return q;
       },
       maybeSingle: async () => {
