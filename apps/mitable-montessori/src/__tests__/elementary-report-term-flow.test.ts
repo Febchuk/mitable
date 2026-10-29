@@ -4,6 +4,7 @@ import { decodeExamGrades } from "@/lib/reports/exam-grades-payload";
 import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
 import { decodeProgressTopic } from "@/lib/reports/progress-topic-payload";
 import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
+import { encodeTermSkills, termSkillsForDisplay } from "@/lib/reports/term-skills";
 
 const mocks = vi.hoisted(() => ({ db: null as unknown, schoolId: "school", agent: vi.fn() }));
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => mocks.db }));
@@ -27,6 +28,7 @@ vi.mock("@/lib/app/active-classroom", async (original) => ({
   ],
 }));
 vi.mock("@/lib/audit/log", () => ({ auditLog: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/reports/agent-loop", async (original) => ({
   ...(await original<object>()),
   runReportAgent: mocks.agent,
@@ -35,6 +37,7 @@ import { POST as saveGrade } from "@/app/api/v1/elementary-grades/route";
 import { POST as saveComment } from "@/app/api/v1/elementary-grade-comments/route";
 import { POST as create } from "@/app/api/v1/reports/route";
 import { POST as regenerate } from "@/app/api/v1/reports/[id]/draft/route";
+import { PATCH as updateReport } from "@/app/api/v1/reports/[id]/route";
 import { GET as listTerms } from "@/app/api/v1/school-terms/route";
 import { getReport } from "@/lib/queries/reports";
 import { sendReport } from "@/lib/reports/workflow";
@@ -313,4 +316,45 @@ it("shows the term's furthest milestone on preview and send, then freezes it for
     changed_at: "2027-02-03T09:00:00Z",
   });
   expect(grid((await getReport(String(report.id)))!)?.[0].status).toBe("mastered");
+});
+
+it("keeps manual term skills through save, reopen, regeneration, send and parent PDF conversion", async () => {
+  const report = await createReport(FUTURE);
+  const sections = report.sections as Array<{
+    id: string;
+    heading: string;
+    paragraphs: Array<{ id: string; html: string }>;
+  }>;
+  const skills = sections.find((section) => section.heading === "Skills report")!;
+  expect(
+    termSkillsForDisplay(skills.paragraphs[0].html).every((group) =>
+      group.rows.every((row) => !row.value)
+    )
+  ).toBe(true);
+  skills.paragraphs[0].html = encodeTermSkills({ "0-0": "Excellent", "2-0": "Developing" });
+  const updated = await updateReport(
+    new Request("http://localhost/api", { method: "PATCH", body: JSON.stringify({ sections }) }),
+    { params: Promise.resolve({ id: String(report.id) }) }
+  );
+  expect(updated.status).toBe(200);
+  const reopened = await getReport(String(report.id));
+  expect(
+    reopened?.sections?.find((section) => section.heading === "Skills report")?.paragraphs[0].html
+  ).toBe(skills.paragraphs[0].html);
+  expect(
+    (await regenerate(req({}), { params: Promise.resolve({ id: String(report.id) }) })).status
+  ).toBe(200);
+  expect(mocks.agent).not.toHaveBeenCalled();
+  await sendReport(
+    { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+    [],
+    {}
+  );
+  const blocks = buildReportPdfBlocks(
+    report.sections as Parameters<typeof buildReportPdfBlocks>[0],
+    report.section_meta as Parameters<typeof buildReportPdfBlocks>[1]
+  );
+  const block = blocks.find((block) => block.kind === "term_skills");
+  expect(block?.kind).toBe("term_skills");
+  if (block?.kind === "term_skills") expect(block.groups[0].rows[0].value).toBe("Excellent");
 });

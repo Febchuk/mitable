@@ -1,5 +1,6 @@
 import { toddlerSendSnapshot } from "@/lib/reports/toddler-send-snapshot";
 import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
+import { termSkillsSection } from "@/lib/reports/term-skills";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
@@ -311,6 +312,13 @@ export async function POST(req: Request) {
     const merged = mergeTermHistory({ sections: sections ?? [], sectionMeta }, built);
     sections = merged.sections;
     sectionMeta = merged.sectionMeta;
+    if (
+      isElementaryClassroomCode(reportClassroom?.code) &&
+      !sections.some((section) => sectionMeta[section.heading]?.type === "term_skills")
+    ) {
+      sections.push(termSkillsSection());
+      sectionMeta["Skills report"] = { type: "term_skills" };
+    }
   }
 
   if (input.kind === "Daily" && isToddlerClassroomCode(reportClassroom?.code)) {

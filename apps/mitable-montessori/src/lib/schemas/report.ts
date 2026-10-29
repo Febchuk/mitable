@@ -47,7 +47,7 @@ export type CreateReportRequest = z.infer<typeof CreateReportRequestSchema>;
 
 export const UpdateReportRequestSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  body: z.string().max(8000).optional(),
+  body: z.string().max(200000).optional(),
   sections: z
     .array(
       z.object({
@@ -56,7 +56,7 @@ export const UpdateReportRequestSchema = z.object({
         paragraphs: z.array(z.object({ id: z.string(), html: z.string() })),
       })
     )
-    .max(20)
+    .max(100)
     .optional(),
 });
 export type UpdateReportRequest = z.infer<typeof UpdateReportRequestSchema>;

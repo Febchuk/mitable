@@ -21,6 +21,7 @@ import { STATUS_COLOR, STATUS_LABEL, statusToMark } from "@/components/montessor
 import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
+import { TermSkillsField } from "./term-skills-field";
 
 const COMING_SOON = "Editing this section is coming soon — chat assistant will land first.";
 const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
@@ -807,7 +808,9 @@ function SectionBlock({
         const structuredFirst =
           paraIndex === 0 &&
           fieldMeta &&
-          (fieldMeta.type === "checklist" || fieldMeta.type === "single_select");
+          (fieldMeta.type === "checklist" ||
+            fieldMeta.type === "single_select" ||
+            fieldMeta.type === "term_skills");
         const serverFilledFirst =
           paraIndex === 0 &&
           (dailyLogSection ||
@@ -884,7 +887,9 @@ function SectionBlock({
                 </>
               )}
             </div>
-            {structuredFirst && fieldMeta.type === "checklist" ? (
+            {structuredFirst && fieldMeta.type === "term_skills" ? (
+              <TermSkillsField html={p.html} onCommit={(next) => onParagraphCommit(p.id, next)} />
+            ) : structuredFirst && fieldMeta.type === "checklist" ? (
               <TemplateChecklistField
                 heading={section.heading}
                 options={fieldMeta.options}

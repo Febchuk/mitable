@@ -21,6 +21,7 @@ import {
 } from "@/lib/reports/template-field-payload";
 import { decodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
 import { decodeExamGrades } from "@/lib/reports/exam-grades-payload";
+import { termSkillsForDisplay } from "@/lib/reports/term-skills";
 import { isTopicCommentsHeading } from "@/lib/reports/default-classroom-report";
 import { statusToMark } from "@/lib/progress/marking-schemas";
 
@@ -110,6 +111,17 @@ export function buildReportPdfBlocks(
       continue;
     }
 
+    if (entry?.type === "term_skills") {
+      blocks.push({
+        kind: "term_skills",
+        heading: section.heading,
+        groups: termSkillsForDisplay(section.paragraphs[0]?.html ?? ""),
+        notes: section.paragraphs
+          .slice(1)
+          .map((paragraph) => fieldPayloadToReadableText(paragraph.html)),
+      });
+      continue;
+    }
     if (entry?.type === "exam_grades") {
       blocks.push({
         kind: "exam_grades",

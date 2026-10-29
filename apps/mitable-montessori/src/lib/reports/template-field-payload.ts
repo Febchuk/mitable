@@ -5,6 +5,7 @@
  */
 
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
+import { isTermSkillsPayload, termSkillsForDisplay, termSkillsToReadableText } from "./term-skills";
 import {
   isProgressTopicPayload,
   progressTopicToReadableText,
@@ -150,6 +151,7 @@ export function inferSingleSelect(proseHtml: string, options: string[]): string 
 
 /** Plain text for PDF, chat tokenization, and markdown `body` — never exposes raw JSON prefixes. */
 export function fieldPayloadToReadableText(html: string): string {
+  if (isTermSkillsPayload(html)) return termSkillsToReadableText(html);
   if (decodeExamGrades(html)) return examGradesToReadableText(html);
   if (isProgressTopicPayload(html)) {
     return progressTopicToReadableText(html);
@@ -171,6 +173,8 @@ export function fieldPayloadToReadableText(html: string): string {
  * (autosave draft kickoff uses this).
  */
 export function paragraphHasTeacherContent(html: string): boolean {
+  if (isTermSkillsPayload(html))
+    return termSkillsForDisplay(html).some((group) => group.rows.some((row) => row.value));
   const d = decodeFieldPayload(html);
   if (d.kind === "checklist") return d.selected.length > 0;
   if (d.kind === "single_select") return (d.value?.trim().length ?? 0) > 0;
@@ -212,6 +216,7 @@ export function normalizeSectionHtmlForTemplate(
     entry.type === "curriculum" ||
     entry.type === "progress_topic" ||
     entry.type === "term_history" ||
+    entry.type === "term_skills" ||
     entry.type === "exam_grades"
   ) {
     return html;

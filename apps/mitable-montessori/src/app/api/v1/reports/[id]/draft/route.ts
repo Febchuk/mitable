@@ -1,5 +1,7 @@
 import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
 import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
+import { termSkillsSection } from "@/lib/reports/term-skills";
+import { isElementaryClassroomCode } from "@/lib/app/active-classroom";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
@@ -93,13 +95,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   // Fetch classroom name so [CLASSROOM_n] also de-tokenizes properly.
   let classroomDisplay = "";
+  let elementary = false;
   {
     const { data: classroom } = await supabase
       .from("classrooms")
-      .select("name")
+      .select("name, code")
       .eq("id", report.classroom_id as string)
       .maybeSingle();
     classroomDisplay = (classroom as { name: string | null } | null)?.name?.trim() ?? "";
+    elementary = isElementaryClassroomCode(classroom?.code);
   }
   if (report.status !== "draft") {
     return NextResponse.json(
@@ -134,6 +138,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     );
     report.sections = merged.sections;
     report.section_meta = merged.sectionMeta;
+    if (
+      elementary &&
+      !report.sections.some(
+        (section: { heading: string }) =>
+          report.section_meta[section.heading]?.type === "term_skills"
+      )
+    ) {
+      report.sections.push(termSkillsSection());
+      report.section_meta["Skills report"] = { type: "term_skills" };
+    }
   }
   const storedSections = (report.sections as Array<{ heading: string }> | null) ?? [];
   const storedSectionMeta = (report.section_meta as SectionMeta | null) ?? {};
@@ -385,12 +399,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
               paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
           }
-          if (meta?.type === "exam_grades" || meta?.type === "term_history") {
+          if (
+            meta?.type === "exam_grades" ||
+            meta?.type === "term_history" ||
+            meta?.type === "term_skills"
+          ) {
             return {
               id: `s-${i}-${slug}`,
               heading,
               paragraphs:
-                meta.type === "term_history"
+                meta.type === "term_history" || meta.type === "term_skills"
                   ? paragraphsForTermHistory(heading)
                   : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
@@ -576,12 +594,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
-        if (meta?.type === "exam_grades" || meta?.type === "term_history") {
+        if (
+          meta?.type === "exam_grades" ||
+          meta?.type === "term_history" ||
+          meta?.type === "term_skills"
+        ) {
           return {
             id: `s-${i}-${slug}`,
             heading,
             paragraphs:
-              meta.type === "term_history"
+              meta.type === "term_history" || meta.type === "term_skills"
                 ? paragraphsForTermHistory(heading)
                 : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
@@ -648,12 +670,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs: [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
         }
-        if (cur?.type === "exam_grades" || cur?.type === "term_history") {
+        if (
+          cur?.type === "exam_grades" ||
+          cur?.type === "term_history" ||
+          cur?.type === "term_skills"
+        ) {
           return {
             id: `s-${i}-${slug}`,
             heading,
             paragraphs:
-              cur.type === "term_history"
+              cur.type === "term_history" || cur.type === "term_skills"
                 ? paragraphsForTermHistory(heading)
                 : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
