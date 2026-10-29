@@ -41,6 +41,14 @@ export function ParentReportView({
   return (
     <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
       <header className="border-b border-border px-6 py-8 sm:px-10 sm:py-10">
+        {brand ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={brand.logoPath}
+            alt={brand.name}
+            className="mb-6 h-20 w-auto max-w-full object-contain"
+          />
+        ) : null}
         <p className="label-cap text-ink-muted">{reportType} report</p>
         <h1 className="mt-2 font-display text-4xl leading-tight text-ink sm:text-5xl">{title}</h1>
         <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-secondary">
