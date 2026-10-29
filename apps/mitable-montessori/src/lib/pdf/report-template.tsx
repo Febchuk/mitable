@@ -3,6 +3,7 @@ import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/render
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
 import type { ReportMediaItem } from "@/lib/media/report-media";
 import type { termSkillsForDisplay } from "@/lib/reports/term-skills";
+import type { ExamGradeReportSummary } from "@/lib/reports/exam-grades-payload";
 
 /* ------------------------------------------------------------------ */
 /*  Palette — mirrors src/styles/globals.css theme tokens. react-pdf   */
@@ -61,10 +62,7 @@ export interface ReportPdfProgressGroup {
   rows: ReportPdfProgressRow[];
 }
 
-export interface ReportPdfExamGradeSummary {
-  averagePercentage: number;
-  comment: string | null;
-}
+export type ReportPdfExamGradeSummary = ExamGradeReportSummary;
 
 /**
  * A rendered report is a list of blocks. `subject` blocks mirror the
@@ -490,15 +488,45 @@ function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "ex
       {!block.summary ? (
         <Text style={s.emptyProgress}>No exam grades were recorded for this term.</Text>
       ) : (
-        <View style={s.examTable}>
-          <View style={[s.examRow, s.examHeader]} wrap={false}>
-            <Text style={[s.examCell, { fontWeight: "bold" }]}>Overall average</Text>
-            <Text style={[s.examCell, { fontWeight: "bold" }]}>Comments</Text>
-          </View>
-          <View style={s.examRow} wrap={false}>
-            <Text style={s.examCell}>{block.summary.averagePercentage}%</Text>
-            <Text style={s.examCell}>{block.summary.comment?.trim() || "—"}</Text>
-          </View>
+        <View>
+          {block.summary.rows?.length ? (
+            <View style={[s.examTable, { marginBottom: 12 }]}>
+              <View style={[s.examRow, s.examHeader]} wrap={false}>
+                {["Subject", "CA /40", "Participation /20", "AFL /40", "Total /100"].map(
+                  (label, index) => (
+                    <Text
+                      key={label}
+                      style={[
+                        s.examCell,
+                        { flex: index === 0 ? 2 : 1, fontSize: 8, fontWeight: "bold" },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  )
+                )}
+              </View>
+              {block.summary.rows.map((row, index) => (
+                <View key={index} style={s.examRow} wrap={false}>
+                  <Text style={[s.examCell, { flex: 2 }]}>{row.subject}</Text>
+                  {[row.caScore, row.classParticipationScore, row.aflScore, row.total].map(
+                    (value, column) => (
+                      <Text key={column} style={[s.examCell, { flex: 1 }]}>
+                        {value ?? "—"}
+                      </Text>
+                    )
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <Text style={[s.paragraph, { fontWeight: "bold" }]}>
+            Overall average: {block.summary.averagePercentage}%
+            {block.summary.overallGradeLabel
+              ? ` · Overall grade: ${block.summary.overallGradeLabel}`
+              : ""}
+          </Text>
+          <Text style={s.paragraph}>Comments: {block.summary.comment?.trim() || "—"}</Text>
         </View>
       )}
     </View>

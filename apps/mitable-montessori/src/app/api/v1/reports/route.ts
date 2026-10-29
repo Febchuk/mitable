@@ -31,7 +31,7 @@ import {
 import { endOfTermPeriodBounds } from "@/lib/reports/term-period";
 import { getSchoolTerm, type SchoolTerm } from "@/lib/queries/school-terms";
 import {
-  getStudentTermGradeComment,
+  getStudentTermGradeFeedback,
   listStudentExamGradesForTerm,
 } from "@/lib/queries/elementary-grades";
 import { encodeExamGrades, summarizeExamGrades } from "@/lib/reports/exam-grades-payload";
@@ -281,9 +281,9 @@ export async function POST(req: Request) {
       studentId: input.childId,
       termId,
     };
-    const [gradeRows, termComment] = await Promise.all([
+    const [gradeRows, feedback] = await Promise.all([
       listStudentExamGradesForTerm(gradeScope),
-      getStudentTermGradeComment(gradeScope),
+      getStudentTermGradeFeedback(gradeScope),
     ]);
     const heading = "Exam grades";
     sections = [
@@ -294,7 +294,12 @@ export async function POST(req: Request) {
         paragraphs: [
           {
             id: `p-exam-grades-${termId}`,
-            html: encodeExamGrades(summarizeExamGrades(gradeRows, termComment)),
+            html: encodeExamGrades(
+              summarizeExamGrades(gradeRows, feedback.comment, {
+                includeBreakdown: true,
+                overallGradeLabel: feedback.overallGradeLabel,
+              })
+            ),
           },
         ],
       },

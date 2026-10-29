@@ -22,6 +22,7 @@ import { ToastBus } from "../primitives";
 import { Bolt } from "./icons";
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 import { TermSkillsField } from "./term-skills-field";
+import { ExamGradeSummary } from "@/components/montessori/exam-grade-summary";
 
 const COMING_SOON = "Editing this section is coming soon — chat assistant will land first.";
 const toast = (msg = COMING_SOON) => ToastBus.push({ message: msg });
@@ -550,22 +551,7 @@ function ExamGradesTable({ html }: { html: string }) {
   return (
     <div className="rd-template-field rd-progress-topic" aria-readonly>
       {summary ? (
-        <table className="rd-progress-topic-table">
-          <thead>
-            <tr>
-              <th>Overall average</th>
-              <th>Comments</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                <strong>{summary.averagePercentage}%</strong>
-              </td>
-              <td>{summary.comment?.trim() || "—"}</td>
-            </tr>
-          </tbody>
-        </table>
+        <ExamGradeSummary summary={summary} />
       ) : (
         <p style={{ margin: 0, color: "var(--color-ink-muted)", fontStyle: "italic" }}>
           No exam grades were recorded for this term.

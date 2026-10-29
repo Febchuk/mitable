@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SectionMeta } from "@/lib/report-templates/sections";
 import {
-  getStudentTermGradeComment,
+  getStudentTermGradeFeedback,
   listStudentExamGradesForTerm,
 } from "@/lib/queries/elementary-grades";
 import { encodeExamGrades, summarizeExamGrades } from "./exam-grades-payload";
@@ -41,11 +41,16 @@ export async function elementaryGradeSnapshot(
     studentId: report.student_id,
     termId: report.term_id,
   };
-  const [grades, comment] = await Promise.all([
+  const [grades, feedback] = await Promise.all([
     listStudentExamGradesForTerm(scope),
-    getStudentTermGradeComment(scope),
+    getStudentTermGradeFeedback(scope),
   ]);
-  const html = encodeExamGrades(summarizeExamGrades(grades, comment));
+  const html = encodeExamGrades(
+    summarizeExamGrades(grades, feedback.comment, {
+      includeBreakdown: true,
+      overallGradeLabel: feedback.overallGradeLabel,
+    })
+  );
   return {
     sections: (report.sections ?? []).map((section) =>
       report.section_meta?.[section.heading]?.type === "exam_grades"

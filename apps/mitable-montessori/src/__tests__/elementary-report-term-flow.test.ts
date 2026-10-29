@@ -29,6 +29,7 @@ vi.mock("@/lib/app/active-classroom", async (original) => ({
 }));
 vi.mock("@/lib/audit/log", () => ({ auditLog: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/anthropic/client", () => ({ getAnthropic: () => ({}), SONNET_MODEL: "test-model" }));
 vi.mock("@/lib/reports/agent-loop", async (original) => ({
   ...(await original<object>()),
   runReportAgent: mocks.agent,
@@ -132,7 +133,33 @@ it("uses the explicitly chosen future term for saved grades, comment and reporti
     period_start: "2027-01-11",
     period_end: "2027-03-27",
   });
-  expect(summary(report)).toEqual({ averagePercentage: 90, comment: "A strong term." });
+  expect(summary(report)).toMatchObject({ averagePercentage: 90, comment: "A strong term." });
+  expect(summary(report)?.rows).toEqual([
+    {
+      subject: "Language",
+      assessmentName: "End-of-term exam",
+      caScore: null,
+      classParticipationScore: null,
+      aflScore: null,
+      total: 90,
+    },
+    {
+      subject: "Math",
+      assessmentName: "End-of-term exam",
+      caScore: null,
+      classParticipationScore: null,
+      aflScore: null,
+      total: 80,
+    },
+    {
+      subject: "Science",
+      assessmentName: "End-of-term exam",
+      caScore: null,
+      classParticipationScore: null,
+      aflScore: null,
+      total: 100,
+    },
+  ]);
   expect(
     buildReportPdfBlocks(
       report.sections as Parameters<typeof buildReportPdfBlocks>[0],
@@ -141,7 +168,7 @@ it("uses the explicitly chosen future term for saved grades, comment and reporti
   ).toContainEqual({
     kind: "exam_grades",
     heading: "Exam grades",
-    summary: { averagePercentage: 90, comment: "A strong term." },
+    summary: expect.objectContaining({ averagePercentage: 90, comment: "A strong term." }),
   });
 });
 it("defaults to the current term without silently borrowing another term's grades", async () => {
@@ -157,11 +184,14 @@ it("refreshes saved grades and comments on reopen and regeneration while keeping
   fixture.tables.elementary_exam_grades[0].percentage = 100;
   fixture.tables.elementary_term_grade_comments[0].comment = "Updated comment.";
   const preview = await getReport(String(report.id));
-  expect(summary(preview!)).toEqual({ averagePercentage: 96.67, comment: "Updated comment." });
-  expect(summary(report)).toEqual({ averagePercentage: 90, comment: "A strong term." });
+  expect(summary(preview!)).toMatchObject({
+    averagePercentage: 96.67,
+    comment: "Updated comment.",
+  });
+  expect(summary(report)).toMatchObject({ averagePercentage: 90, comment: "A strong term." });
   const drafted = await regenerate(req({}), { params: Promise.resolve({ id: String(report.id) }) });
   expect(drafted.status).toBe(200);
-  expect(summary(report)).toEqual({ averagePercentage: 96.67, comment: "Updated comment." });
+  expect(summary(report)).toMatchObject({ averagePercentage: 96.67, comment: "Updated comment." });
   expect(report.term_id).toBe(FUTURE);
   expect(mocks.agent).not.toHaveBeenCalled();
 });
@@ -190,7 +220,7 @@ it("isolates grades by school, classroom, child and selected term", async () => 
     { ...original, school_id: "other-school", percentage: 0 },
     { ...original, term_id: CURRENT, percentage: 0 }
   );
-  expect(summary(await createReport(FUTURE))).toEqual({
+  expect(summary(await createReport(FUTURE))).toMatchObject({
     averagePercentage: 90,
     comment: "A strong term.",
   });
@@ -235,7 +265,7 @@ it("honors an explicit end-of-term selection with a legacy template period", asy
     period_start: "2027-01-11",
     period_end: "2027-03-27",
   });
-  expect(summary(fixture.tables.reports[0])).toEqual({
+  expect(summary(fixture.tables.reports[0])).toMatchObject({
     averagePercentage: 90,
     comment: "A strong term.",
   });
@@ -357,4 +387,229 @@ it("keeps manual term skills through save, reopen, regeneration, send and parent
   const block = blocks.find((block) => block.kind === "term_skills");
   expect(block?.kind).toBe("term_skills");
   if (block?.kind === "term_skills") expect(block.groups[0].rows[0].value).toBe("Excellent");
+});
+
+it("computes the subject total from components and snapshots the overall letter grade in the selected term", async () => {
+  const saved = await saveGrade(
+    req({
+      classroomId: ROOM,
+      studentId: CHILD,
+      termId: FUTURE,
+      subject: "Geography",
+      assessmentName: "Term assessment",
+      caScore: 31.5,
+      classParticipationScore: 18,
+      aflScore: 17,
+      percentage: 99,
+      gradeLabel: "A",
+    })
+  );
+  expect(saved.status).toBe(200);
+  expect((await saved.json()).grade).toMatchObject({
+    percentage: 66.5,
+    caScore: 31.5,
+    classParticipationScore: 18,
+    aflScore: 17,
+    gradeLabel: "",
+  });
+  expect(
+    (
+      await saveComment(
+        req({
+          classroomId: ROOM,
+          studentId: CHILD,
+          termId: FUTURE,
+          comment: "A productive term.",
+          overallGradeLabel: "B",
+        })
+      )
+    ).status
+  ).toBe(200);
+  const report = await createReport(FUTURE);
+  expect(summary(report)).toEqual({
+    averagePercentage: 66.5,
+    comment: "A productive term.",
+    overallGradeLabel: "B",
+    rows: [
+      {
+        subject: "Geography",
+        assessmentName: "Term assessment",
+        caScore: 31.5,
+        classParticipationScore: 18,
+        aflScore: 17,
+        total: 66.5,
+      },
+    ],
+  });
+  await saveComment(
+    req({
+      classroomId: ROOM,
+      studentId: CHILD,
+      termId: FUTURE,
+      comment: "Reviewed feedback.",
+      overallGradeLabel: "A",
+    })
+  );
+  expect(summary((await getReport(String(report.id)))!)?.overallGradeLabel).toBe("A");
+  await sendReport(
+    { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+    [],
+    {}
+  );
+  expect(summary(report)?.overallGradeLabel).toBe("A");
+  await saveComment(
+    req({
+      classroomId: ROOM,
+      studentId: CHILD,
+      termId: FUTURE,
+      comment: "Later feedback.",
+      overallGradeLabel: "C",
+    })
+  );
+  expect(summary((await getReport(String(report.id)))!)?.overallGradeLabel).toBe("A");
+});
+
+it.each([
+  { caScore: 41, classParticipationScore: 10, aflScore: 10 },
+  { caScore: 10, classParticipationScore: 21, aflScore: 10 },
+  { caScore: 10, classParticipationScore: 10, aflScore: 41 },
+  { caScore: -1, classParticipationScore: 10, aflScore: 10 },
+  { caScore: 10, classParticipationScore: 10 },
+  { caScore: 10.125, classParticipationScore: 10, aflScore: 10 },
+])("rejects invalid or incomplete component scores: %j", async (scores) => {
+  const response = await saveGrade(
+    req({
+      classroomId: ROOM,
+      studentId: CHILD,
+      termId: FUTURE,
+      subject: "Math",
+      assessmentName: "Term assessment",
+      ...scores,
+    })
+  );
+  expect(response.status).toBe(400);
+  expect(fixture.tables.elementary_exam_grades).toHaveLength(0);
+});
+
+it("accepts zero scores and total-only results without inventing components or requiring subject letter grades", async () => {
+  const context = {
+    classroomId: ROOM,
+    studentId: CHILD,
+    termId: FUTURE,
+    assessmentName: "Term assessment",
+  };
+  const zero = await saveGrade(
+    req({ ...context, subject: "Math", caScore: 0, classParticipationScore: 0, aflScore: 0 })
+  );
+  expect(zero.status).toBe(200);
+  expect((await zero.json()).grade).toMatchObject({
+    percentage: 0,
+    caScore: 0,
+    classParticipationScore: 0,
+    aflScore: 0,
+    gradeLabel: "",
+  });
+  const total = await saveGrade(req({ ...context, subject: "Language", percentage: 80 }));
+  expect(total.status).toBe(200);
+  expect((await total.json()).grade).toMatchObject({
+    percentage: 80,
+    caScore: null,
+    classParticipationScore: null,
+    aflScore: null,
+  });
+  expect(summary(await createReport(FUTURE))?.averagePercentage).toBe(40);
+});
+
+it("saves an overall grade without a comment and preserves it when an older client updates the comment", async () => {
+  const context = { classroomId: ROOM, studentId: CHILD, termId: FUTURE };
+  expect(
+    (await saveComment(req({ ...context, comment: null, overallGradeLabel: "B" }))).status
+  ).toBe(200);
+  expect(fixture.tables.elementary_term_grade_comments[0]).toMatchObject({
+    comment: "",
+    overall_grade_label: "B",
+  });
+  await saveComment(req({ ...context, comment: "New comment." }));
+  expect(fixture.tables.elementary_term_grade_comments[0]).toMatchObject({
+    comment: "New comment.",
+    overall_grade_label: "B",
+  });
+  await saveComment(req({ ...context, comment: null }));
+  expect(fixture.tables.elementary_term_grade_comments[0].overall_grade_label).toBe("B");
+  await saveComment(req({ ...context, comment: null, overallGradeLabel: null }));
+  expect(fixture.tables.elementary_term_grade_comments).toHaveLength(0);
+});
+
+it("rejects unsupported overall letters and updates to a grade outside the selected child/class/term", async () => {
+  const context = { classroomId: ROOM, studentId: CHILD, termId: FUTURE };
+  expect(
+    (await saveComment(req({ ...context, comment: null, overallGradeLabel: "A*" }))).status
+  ).toBe(400);
+  const id = "88888888-8888-4888-8888-888888888888";
+  fixture.tables.elementary_exam_grades.push({
+    id,
+    school_id: "school",
+    classroom_id: "other-class",
+    student_id: CHILD,
+    term_id: FUTURE,
+    percentage: 50,
+  });
+  expect(
+    (
+      await saveGrade(
+        req({
+          ...context,
+          id,
+          subject: "Math",
+          assessmentName: "Term assessment",
+          caScore: 40,
+          classParticipationScore: 20,
+          aflScore: 40,
+        })
+      )
+    ).status
+  ).toBe(500);
+  expect(fixture.tables.elementary_exam_grades[0].percentage).toBe(50);
+});
+
+it("preserves teacher-marked skills when the writing assistant drafts the term's narrative", async () => {
+  fixture.tables.student_progress_history = [
+    {
+      id: "work",
+      student_id: CHILD,
+      curriculum_subtopic_id: "beads",
+      new_status: "mastered",
+      comment: null,
+      changed_at: "2027-02-01T09:00:00Z",
+    },
+  ];
+  const report = await createReport(FUTURE);
+  const skills = (
+    report.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>
+  ).find((section) => section.heading === "Skills report")!;
+  skills.paragraphs[0].html = encodeTermSkills({ "0-0": "Excellent" });
+  mocks.agent.mockResolvedValue({
+    draft: {
+      title: "Term report",
+      sections: [{ heading: "Practical Life — Comments", content: "Specific recorded work." }],
+    },
+    references: { refs: [] },
+    turns: 1,
+    regenerations: 0,
+  });
+  const response = await regenerate(req({ notes: ["Recorded observations."] }), {
+    params: Promise.resolve({ id: String(report.id) }),
+  });
+  expect(await response.clone().json()).not.toHaveProperty("error");
+  expect(response.status).toBe(200);
+  expect(mocks.agent).toHaveBeenCalledOnce();
+  const saved = (report.sections as (typeof skills)[]).find(
+    (section) => section.heading === "Skills report"
+  )!;
+  expect(termSkillsForDisplay(saved.paragraphs[0].html)[0].rows[0].value).toBe("Excellent");
+  expect(
+    mocks.agent.mock.calls[0][0].templateSections.map(
+      (section: { heading: string }) => section.heading
+    )
+  ).not.toContain("Skills report");
 });
