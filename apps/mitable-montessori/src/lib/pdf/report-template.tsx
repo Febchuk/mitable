@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Image, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas";
 import type { ReportMediaItem } from "@/lib/media/report-media";
+import type { termSkillsForDisplay } from "@/lib/reports/term-skills";
 
 /* ------------------------------------------------------------------ */
 /*  Palette — mirrors src/styles/globals.css theme tokens. react-pdf   */
@@ -72,6 +73,12 @@ export interface ReportPdfExamGradeSummary {
  * blocks are ordinary prose / checklist sections.
  */
 export type ReportPdfBlock =
+  | {
+      kind: "term_skills";
+      heading: string;
+      groups: ReturnType<typeof termSkillsForDisplay>;
+      notes: string[];
+    }
   | {
       kind: "subject";
       index: number;
@@ -324,7 +331,12 @@ const s = StyleSheet.create({
 function formatDate(raw: string): string {
   try {
     const d = new Date(raw);
-    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    return d.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
   } catch {
     return raw;
   }
@@ -445,6 +457,32 @@ function PlainSection({ block }: { block: Extract<ReportPdfBlock, { kind: "secti
   );
 }
 
+function TermSkillsBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "term_skills" }> }) {
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionHeading}>{block.heading}</Text>
+      {block.groups.map((group) => (
+        <View key={group.label} style={{ marginBottom: 12 }}>
+          <Text style={[s.sectionHeading, { fontSize: 10 }]}>{group.label}</Text>
+          <View style={s.examTable}>
+            {group.rows.map((row) => (
+              <View key={row.id} style={s.examRow} wrap={false}>
+                <Text style={[s.examCell, { flex: 2 }]}>{row.label}</Text>
+                <Text style={s.examCell}>{row.value || "Not rated"}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+      {block.notes.map((note, index) => (
+        <Text key={index} style={s.paragraph}>
+          {note}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "exam_grades" }> }) {
   return (
     <View style={s.section}>
@@ -495,6 +533,7 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
       (b) =>
         b.kind === "subject" ||
         b.kind === "exam_grades" ||
+        b.kind === "term_skills" ||
         b.paragraphs.some((p) => p.field || p.text.length > 0) ||
         b.heading.length > 0
     );
@@ -540,6 +579,8 @@ export function ReportDocument({ data }: { data: ReportPdfData }) {
           ? data.blocks.map((block, bi) =>
               block.kind === "subject" ? (
                 <SubjectBlock key={bi} block={block} />
+              ) : block.kind === "term_skills" ? (
+                <TermSkillsBlock key={block.heading} block={block} />
               ) : block.kind === "exam_grades" ? (
                 <ExamGradesBlock key={bi} block={block} />
               ) : (

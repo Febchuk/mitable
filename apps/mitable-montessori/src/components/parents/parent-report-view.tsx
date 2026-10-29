@@ -4,6 +4,8 @@ import { STATUS_LABEL, type ProgressMark } from "@/lib/progress/marking-schemas"
 import { ToddlerDailyLogSummary } from "@/components/montessori/toddler-daily-log-summary";
 import type { ReportMediaItem } from "@/lib/media/report-media";
 import { getSchoolBranding } from "@/lib/branding/school";
+import { TermSkillsField } from "@/components/montessori/report-detail/term-skills-field";
+import { encodeTermSkills } from "@/lib/reports/term-skills";
 
 const MARK_CLASS: Record<ProgressMark, string> = {
   m: "bg-sage-soft text-sage-deep",
@@ -61,6 +63,24 @@ export function ParentReportView({
           blocks.map((block) =>
             block.kind === "subject" ? (
               <SubjectBlock key={`${block.index}-${block.heading}`} block={block} />
+            ) : block.kind === "term_skills" ? (
+              <section key={block.heading}>
+                <h2 className="mb-3 text-lg font-semibold text-ink">{block.heading}</h2>
+                <TermSkillsField
+                  html={encodeTermSkills(
+                    Object.fromEntries(
+                      block.groups.flatMap((group) =>
+                        group.rows.flatMap((row) => (row.value ? [[row.id, row.value]] : []))
+                      )
+                    )
+                  )}
+                />
+                {block.notes.map((note, index) => (
+                  <p key={index} className="mt-3 whitespace-pre-wrap text-sm text-ink-secondary">
+                    {note}
+                  </p>
+                ))}
+              </section>
             ) : block.kind === "exam_grades" ? (
               <ExamGradesBlock key={block.heading} block={block} />
             ) : (
