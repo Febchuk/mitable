@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { toddlerReportFixture, ROOM, CHILD, GUARDIAN } from "./helpers/toddler-report-fixture";
 import { decodeExamGrades } from "@/lib/reports/exam-grades-payload";
 import { buildReportPdfBlocks } from "@/lib/pdf/sections-to-pdf-sections";
+import { decodeProgressTopic } from "@/lib/reports/progress-topic-payload";
+import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
 
 const mocks = vi.hoisted(() => ({ db: null as unknown, schoolId: "school", agent: vi.fn() }));
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => mocks.db }));
@@ -234,4 +236,81 @@ it("honors an explicit end-of-term selection with a legacy template period", asy
     averagePercentage: 90,
     comment: "A strong term.",
   });
+});
+
+it("compiles shared term reports on creation and regeneration without sending their text to the drafting agent", async () => {
+  fixture.tables.reports.push({
+    id: "shared-source",
+    student_id: CHILD,
+    students: { school_id: "school" },
+    report_type: "sen",
+    status: "sent",
+    report_date: "2027-02-01",
+    sections: null,
+    body: "Communication improved with support.",
+  });
+  const report = await createReport(FUTURE);
+  const highlights = () =>
+    (report.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>).find(
+      (section) => section.heading === "SEN reports — term highlights"
+    )!;
+  expect(fieldPayloadToReadableText(highlights().paragraphs[0].html)).toContain(
+    "Communication improved with support."
+  );
+  highlights().paragraphs.push({ html: "Teacher follow-up." });
+  const response = await regenerate(req({}), {
+    params: Promise.resolve({ id: String(report.id) }),
+  });
+  expect(response.status).toBe(200);
+  expect(fieldPayloadToReadableText(highlights().paragraphs[0].html)).toContain(
+    "Communication improved with support."
+  );
+  expect(highlights().paragraphs[1].html).toBe("Teacher follow-up.");
+  expect((report.section_meta as Record<string, unknown>)[highlights().heading]).toEqual({
+    type: "term_history",
+  });
+  expect(mocks.agent).not.toHaveBeenCalled();
+});
+
+it("shows the term's furthest milestone on preview and send, then freezes it for parents", async () => {
+  fixture.tables.student_progress_history = [
+    {
+      id: "first",
+      student_id: CHILD,
+      curriculum_subtopic_id: "beads",
+      new_status: "mastered",
+      comment: null,
+      changed_at: "2027-02-01T09:00:00Z",
+    },
+    {
+      id: "second",
+      student_id: CHILD,
+      curriculum_subtopic_id: "beads",
+      new_status: "practicing",
+      comment: "Practised again.",
+      changed_at: "2027-02-02T09:00:00Z",
+    },
+  ];
+  const report = await createReport(FUTURE);
+  const grid = (source: { sections?: unknown }) =>
+    decodeProgressTopic(
+      (source.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>).find(
+        (section) => section.heading === "Practical Life"
+      )!.paragraphs[0].html
+    );
+  expect(grid(report)?.[0].status).toBe("mastered");
+  expect(grid((await getReport(String(report.id)))!)?.[0].status).toBe("mastered");
+  await sendReport(
+    { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+    [],
+    {}
+  );
+  fixture.tables.student_progress_history.push({
+    id: "clear",
+    student_id: CHILD,
+    curriculum_subtopic_id: "beads",
+    new_status: "na",
+    changed_at: "2027-02-03T09:00:00Z",
+  });
+  expect(grid((await getReport(String(report.id)))!)?.[0].status).toBe("mastered");
 });

@@ -743,7 +743,8 @@ function SectionBlock({
     : null;
   const radioGroupName = React.useId();
   const dailyLogSection = section.heading.trim().toLowerCase() === "daily log";
-  const lockedSection = fieldMeta?.type === "exam_grades" || dailyLogSection;
+  const lockedSection =
+    fieldMeta?.type === "exam_grades" || fieldMeta?.type === "term_history" || dailyLogSection;
 
   return (
     <div className="rd-section">
@@ -813,6 +814,7 @@ function SectionBlock({
             fieldMeta?.type === "hardcoded" ||
             fieldMeta?.type === "curriculum" ||
             fieldMeta?.type === "progress_topic" ||
+            fieldMeta?.type === "term_history" ||
             fieldMeta?.type === "exam_grades");
         const hideParagraphDelete = structuredFirst || serverFilledFirst;
 
@@ -912,7 +914,9 @@ function SectionBlock({
                     ? "Filled from this child’s saved Daily Log and Progress entries."
                     : fieldMeta?.type === "curriculum"
                       ? "Filled from this child’s speech targets. Admins edit them under Curriculum → Speech."
-                      : undefined
+                      : fieldMeta?.type === "term_history"
+                        ? "Compiled from reports shared with this family during the selected term. Repeated notes are grouped by date."
+                        : undefined
                 }
               />
             ) : plainTextEditing ? (

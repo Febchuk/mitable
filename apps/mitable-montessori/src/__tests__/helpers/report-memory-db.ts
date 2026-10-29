@@ -18,10 +18,13 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
       if (failures.has(table)) return { data: null, error: { message: failures.get(table)! } };
       const rows = (tables[table] ??= []);
       let upserted: Row[] | undefined;
-      if (operation === "insert")
-        rows.push(
-          ...(Array.isArray(payload) ? payload : [{ id: crypto.randomUUID(), ...payload }])
-        );
+      if (operation === "insert") {
+        upserted = (Array.isArray(payload) ? payload : [payload]).map((item) => ({
+          id: crypto.randomUUID(),
+          ...item,
+        }));
+        rows.push(...upserted);
+      }
       if (operation === "upsert") {
         upserted = [];
         for (const item of Array.isArray(payload) ? payload : [payload]) {

@@ -1,4 +1,5 @@
 import { toddlerSendSnapshot } from "@/lib/reports/toddler-send-snapshot";
+import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
@@ -298,6 +299,18 @@ export async function POST(req: Request) {
       },
     ];
     sectionMeta = { ...sectionMeta, [heading]: { type: "exam_grades", termId } };
+  }
+
+  if (input.kind === "Major") {
+    const built = await buildTermHistorySections(supabase, {
+      schoolId: auth.user.schoolId,
+      studentId: input.childId,
+      periodStart,
+      periodEnd,
+    });
+    const merged = mergeTermHistory({ sections: sections ?? [], sectionMeta }, built);
+    sections = merged.sections;
+    sectionMeta = merged.sectionMeta;
   }
 
   if (input.kind === "Daily" && isToddlerClassroomCode(reportClassroom?.code)) {

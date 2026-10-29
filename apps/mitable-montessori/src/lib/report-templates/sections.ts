@@ -74,6 +74,7 @@ export type SectionMetaEntry =
   | { type: "single_select"; options: string[] }
   | { type: "curriculum"; program: CurriculumProgram }
   | { type: "progress_topic"; topicId: string }
+  | { type: "term_history" }
   | { type: "exam_grades"; termId: string | null };
 
 export type SectionMeta = Record<string, SectionMetaEntry>;
@@ -84,6 +85,7 @@ export function sectionExcludedFromAgent(meta: SectionMetaEntry | undefined): bo
     meta?.type === "hardcoded" ||
     meta?.type === "curriculum" ||
     meta?.type === "progress_topic" ||
+    meta?.type === "term_history" ||
     meta?.type === "exam_grades"
   );
 }
