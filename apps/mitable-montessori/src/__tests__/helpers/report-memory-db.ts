@@ -41,6 +41,10 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
       }
       let data = (upserted ?? rows).filter((row) => filters.every((filter) => filter(row)));
       if (operation === "update") data.forEach((row) => Object.assign(row, payload));
+      if (operation === "delete") {
+        const removed = new Set(data);
+        tables[table] = rows.filter((row) => !removed.has(row));
+      }
       for (const { key, ascending } of [...orders].reverse())
         data = [...data].sort(
           (a, b) =>
@@ -88,6 +92,10 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
       update: (patch: Row) => {
         operation = "update";
         payload = patch;
+        return q;
+      },
+      delete: () => {
+        operation = "delete";
         return q;
       },
       insert: (row: Row | Row[]) => {

@@ -27,6 +27,10 @@ type FormState = {
   assessmentName: string;
   percentage: string;
   gradeLabel: string;
+  mode: "breakdown" | "total";
+  caScore: string;
+  classParticipationScore: string;
+  aflScore: string;
 };
 
 function emptyForm(): FormState {
@@ -35,6 +39,10 @@ function emptyForm(): FormState {
     assessmentName: "End-of-term exam",
     percentage: "",
     gradeLabel: "",
+    mode: "breakdown",
+    caScore: "",
+    classParticipationScore: "",
+    aflScore: "",
   };
 }
 
@@ -49,6 +57,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
   const [saving, setSaving] = React.useState(false);
   const [termComment, setTermComment] = React.useState("");
   const [savingTermComment, setSavingTermComment] = React.useState(false);
+  const [overallGradeLabel, setOverallGradeLabel] = React.useState("");
 
   React.useEffect(() => {
     const firstStudent = initialData.students.find((s) => s.classroomId === classroomId);
@@ -72,7 +81,14 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
 
   React.useEffect(() => {
     setTermComment(selectedTermComment?.comment ?? "");
-  }, [classroomId, termId, selectedStudentId, selectedTermComment?.comment]);
+    setOverallGradeLabel(selectedTermComment?.overallGradeLabel ?? "");
+  }, [
+    classroomId,
+    termId,
+    selectedStudentId,
+    selectedTermComment?.comment,
+    selectedTermComment?.overallGradeLabel,
+  ]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -95,7 +111,13 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    const percentage = Number(form.percentage);
+    const percentage =
+      form.mode === "breakdown"
+        ? Math.round(
+            (Number(form.caScore) + Number(form.classParticipationScore) + Number(form.aflScore)) *
+              100
+          ) / 100
+        : Number(form.percentage);
     if (!selectedStudentId || !termId || Number.isNaN(percentage)) return;
     setSaving(true);
     try {
@@ -111,6 +133,10 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
           assessmentName: form.assessmentName,
           percentage,
           gradeLabel: form.gradeLabel,
+          caScore: form.mode === "breakdown" ? Number(form.caScore) : null,
+          classParticipationScore:
+            form.mode === "breakdown" ? Number(form.classParticipationScore) : null,
+          aflScore: form.mode === "breakdown" ? Number(form.aflScore) : null,
         }),
       });
       const payload = (await response.json()) as { grade?: ElementaryExamGrade; error?: string };
@@ -135,6 +161,11 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
       assessmentName: grade.assessmentName,
       percentage: String(grade.percentage),
       gradeLabel: grade.gradeLabel,
+      mode: grade.caScore != null ? "breakdown" : "total",
+      caScore: grade.caScore == null ? "" : String(grade.caScore),
+      classParticipationScore:
+        grade.classParticipationScore == null ? "" : String(grade.classParticipationScore),
+      aflScore: grade.aflScore == null ? "" : String(grade.aflScore),
     });
     setSelectedStudentId(grade.studentId);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -164,9 +195,14 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
           studentId: selectedStudentId,
           termId,
           comment: termComment.trim() || null,
+          overallGradeLabel: overallGradeLabel || null,
         }),
       });
-      const payload = (await response.json()) as { comment?: string | null; error?: string };
+      const payload = (await response.json()) as {
+        comment?: string | null;
+        overallGradeLabel?: string | null;
+        error?: string;
+      };
       if (!response.ok) throw new Error(payload.error || "Could not save the comment");
       setTermComments((current) => {
         const remaining = current.filter(
@@ -175,14 +211,25 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
             item.termId !== termId ||
             item.studentId !== selectedStudentId
         );
-        return payload.comment
+        return payload.comment || payload.overallGradeLabel
           ? [
               ...remaining,
-              { classroomId, termId, studentId: selectedStudentId, comment: payload.comment },
+              {
+                classroomId,
+                termId,
+                studentId: selectedStudentId,
+                comment: payload.comment ?? "",
+                overallGradeLabel: payload.overallGradeLabel ?? null,
+              },
             ]
           : remaining;
       });
-      ToastBus.push({ message: payload.comment ? "End-of-term comment saved" : "Comment cleared" });
+      ToastBus.push({
+        message:
+          payload.comment || payload.overallGradeLabel
+            ? "End-of-term feedback saved"
+            : "Feedback cleared",
+      });
     } catch (error) {
       ToastBus.push({
         message: error instanceof Error ? error.message : "Could not save the comment",
@@ -197,7 +244,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
       <PageHeader
         overline="Elementary"
         title="Grades"
-        subtitle="Record subject results, then add one end-of-term comment for each student. Reports show the overall average."
+        subtitle="Enter CA, class participation and AFL for each subject. Choose one overall grade and add the term comment."
       />
       <div style={{ padding: 24, maxWidth: 1120, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
@@ -251,7 +298,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                   required
                 />
               </Field>
-              <Field label="Exam">
+              <Field label="Assessment">
                 <input
                   style={inputStyle}
                   value={form.assessmentName}
@@ -260,8 +307,59 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                   required
                 />
               </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <Field label="Percentage">
+              <Field label="Scoring">
+                <select
+                  style={inputStyle}
+                  value={form.mode}
+                  onChange={(event) => update("mode", event.target.value as FormState["mode"])}
+                >
+                  <option value="breakdown">CA + class participation + AFL</option>
+                  <option value="total">Total only (no breakdown available)</option>
+                </select>
+              </Field>
+              {form.mode === "breakdown" ? (
+                <>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0,1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {(
+                      [
+                        ["caScore", "CA /40", 40],
+                        ["classParticipationScore", "Class participation /20", 20],
+                        ["aflScore", "AFL /40", 40],
+                      ] as const
+                    ).map(([key, label, maximum]) => (
+                      <Field key={key} label={label}>
+                        <input
+                          style={inputStyle}
+                          type="number"
+                          min="0"
+                          max={maximum}
+                          step="0.01"
+                          value={form[key]}
+                          onChange={(event) => update(key, event.target.value)}
+                          required
+                        />
+                      </Field>
+                    ))}
+                  </div>
+                  <p className="mb-4 text-sm font-semibold" aria-live="polite">
+                    Total:{" "}
+                    <output aria-label="Calculated total">
+                      {form.caScore !== "" &&
+                      form.classParticipationScore !== "" &&
+                      form.aflScore !== ""
+                        ? `${Math.round((Number(form.caScore) + Number(form.classParticipationScore) + Number(form.aflScore)) * 100) / 100}/100`
+                        : "Enter all three scores"}
+                    </output>
+                  </p>
+                </>
+              ) : (
+                <Field label="Total /100">
                   <input
                     style={inputStyle}
                     type="number"
@@ -274,17 +372,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                     required
                   />
                 </Field>
-                <Field label="Grade equivalent">
-                  <input
-                    style={inputStyle}
-                    value={form.gradeLabel}
-                    onChange={(e) => update("gradeLabel", e.target.value)}
-                    placeholder="B+"
-                    maxLength={80}
-                    required
-                  />
-                </Field>
-              </div>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="submit"
@@ -354,8 +442,12 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                       <div
                         style={{ marginTop: 4, color: "var(--color-ink-secondary)", fontSize: 13 }}
                       >
-                        {grade.assessmentName} · <strong>{grade.percentage}%</strong> ·{" "}
-                        {grade.gradeLabel}
+                        {grade.assessmentName} · <strong>Total {grade.percentage}/100</strong>
+                        <div className="mt-1">
+                          {grade.caScore != null
+                            ? `CA ${grade.caScore}/40 · Participation ${grade.classParticipationScore}/20 · AFL ${grade.aflScore}/40`
+                            : "Saved total only — no breakdown recorded"}
+                        </div>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
@@ -384,11 +476,31 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
               onSubmit={saveTermComment}
               style={{ ...cardStyle, padding: 18, gridColumn: "1 / -1" }}
             >
-              <h2 style={{ fontSize: 17, margin: "0 0 6px" }}>End-of-term comment</h2>
+              <h2 style={{ fontSize: 17, margin: "0 0 6px" }}>
+                Overall grade and end-of-term comment
+              </h2>
               <p style={{ margin: "0 0 16px", color: "var(--color-ink-secondary)", fontSize: 14 }}>
-                This is the one comment that appears beside the student&apos;s overall grade
-                average.
+                This grade and comment describe the cumulative result across all saved subjects.
               </p>
+              <p className="mb-4 text-sm font-semibold">
+                Cumulative average:{" "}
+                {visibleGrades.length
+                  ? `${Math.round((visibleGrades.reduce((sum, grade) => sum + grade.percentage, 0) / visibleGrades.length) * 100) / 100}%`
+                  : "No saved results yet"}
+              </p>
+              <Field label="Overall grade">
+                <select
+                  style={inputStyle}
+                  value={overallGradeLabel}
+                  onChange={(event) => setOverallGradeLabel(event.target.value)}
+                >
+                  <option value="">Not graded yet</option>
+                  <option value="A">A — Excellent</option>
+                  <option value="B">B — Good</option>
+                  <option value="C">C — Satisfactory</option>
+                  <option value="D">D — Encouraged to Improve</option>
+                </select>
+              </Field>
               <Field label="Comments">
                 <textarea
                   style={{ ...inputStyle, minHeight: 110, resize: "vertical" }}
@@ -411,11 +523,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                   cursor: "pointer",
                 }}
               >
-                {savingTermComment
-                  ? "Saving…"
-                  : termComment.trim()
-                    ? "Save comment"
-                    : "Clear comment"}
+                {savingTermComment ? "Saving…" : "Save overall grade and comment"}
               </button>
             </form>
           </div>

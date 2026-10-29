@@ -6,6 +6,7 @@ import type { ReportMediaItem } from "@/lib/media/report-media";
 import { getSchoolBranding } from "@/lib/branding/school";
 import { TermSkillsField } from "@/components/montessori/report-detail/term-skills-field";
 import { encodeTermSkills } from "@/lib/reports/term-skills";
+import { ExamGradeSummary } from "@/components/montessori/exam-grade-summary";
 
 const MARK_CLASS: Record<ProgressMark, string> = {
   m: "bg-sage-soft text-sage-deep",
@@ -162,19 +163,8 @@ function ExamGradesBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "ex
           No exam grades were recorded for this term.
         </p>
       ) : (
-        <div className="mt-3 rounded-xl border border-border text-sm">
-          <div className="grid gap-1 border-b border-border bg-muted px-3 py-2 sm:grid-cols-[180px_1fr]">
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Overall average
-            </span>
-            <span className="font-semibold text-ink">{block.summary.averagePercentage}%</span>
-          </div>
-          <div className="grid gap-1 px-3 py-3 sm:grid-cols-[180px_1fr]">
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-              Comments
-            </span>
-            <span className="text-ink-secondary">{block.summary.comment?.trim() || "—"}</span>
-          </div>
+        <div className="mt-3">
+          <ExamGradeSummary summary={block.summary} />
         </div>
       )}
     </section>
