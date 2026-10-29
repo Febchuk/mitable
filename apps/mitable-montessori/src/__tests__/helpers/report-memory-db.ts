@@ -51,7 +51,8 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
             String(value(a, key) ?? "").localeCompare(String(value(b, key) ?? "")) *
             (ascending ? 1 : -1)
         );
-      return { data: data.slice(start, start + maximum), error: null };
+      // A database response is a JSON snapshot, not a live reference into stored rows.
+      return { data: structuredClone(data.slice(start, start + maximum)), error: null };
     };
     const q = {
       select: () => q,

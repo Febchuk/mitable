@@ -217,6 +217,7 @@ export function normalizeSectionHtmlForTemplate(
     entry.type === "progress_topic" ||
     entry.type === "term_history" ||
     entry.type === "term_skills" ||
+    entry.type === "director_comment" ||
     entry.type === "exam_grades"
   ) {
     return html;

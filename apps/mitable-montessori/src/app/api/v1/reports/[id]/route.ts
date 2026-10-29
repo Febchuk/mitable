@@ -7,6 +7,9 @@ import { getReport } from "@/lib/queries/reports";
 import { UpdateReportRequestSchema } from "@/lib/schemas/report";
 import { scoreAndPersistReport } from "@/lib/reports/score-and-persist";
 import { reportAiScoringEnabled } from "@/lib/feature-flags";
+import { directorComments } from "@/lib/reports/director-comment";
+import type { SectionMeta } from "@/lib/report-templates/sections";
+import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();
@@ -42,7 +45,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const { data: existing } = await supabase
     .from("reports")
-    .select("id, status, created_by_user_id, students!inner(school_id)")
+    .select(
+      "id, status, updated_at, classroom_id, sections, section_meta, created_by_user_id, students!inner(school_id)"
+    )
     .eq("id", id)
     .maybeSingle();
   if (!existing) {
@@ -54,25 +59,74 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Not in your school" }, { status: 403 });
   }
 
+  if (existing.status === "sent") {
+    return NextResponse.json({ error: "Sent reports cannot be edited" }, { status: 409 });
+  }
+  if (auth.user.role !== "admin" && !(await requireTeacherForClassroom(existing.classroom_id))) {
+    return NextResponse.json({ error: "Not assigned to this classroom" }, { status: 403 });
+  }
+  const savedSections = (existing.sections ?? []) as Array<{
+    id: string;
+    heading: string;
+    paragraphs: Array<{ id: string; html: string }>;
+  }>;
+  const meta = (existing.section_meta ?? {}) as SectionMeta;
+  const protectedSections = directorComments(savedSections, meta);
+  if (
+    auth.user.role !== "admin" &&
+    parsed.data.sections &&
+    JSON.stringify(directorComments(parsed.data.sections, meta)) !==
+      JSON.stringify(protectedSections)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Only an admin can change the director's comment. Reload the report before saving other edits.",
+      },
+      { status: 403 }
+    );
+  }
+
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (parsed.data.title !== undefined) update.title = parsed.data.title;
   if (parsed.data.body !== undefined) update.body = parsed.data.body;
   if (parsed.data.sections !== undefined) update.sections = parsed.data.sections;
+  // Never let a body-only write bypass the protected structured comment.
+  if (
+    protectedSections.length &&
+    (parsed.data.sections !== undefined || parsed.data.body !== undefined)
+  ) {
+    update.body = (parsed.data.sections ?? savedSections)
+      .map(
+        (section) =>
+          `# ${section.heading}\n\n${section.paragraphs.map((paragraph) => fieldPayloadToReadableText(paragraph.html)).join("\n\n")}`
+      )
+      .join("\n\n");
+  }
 
-  // Editing a report that's awaiting review pulls it back to draft so the
+  // A teacher editing a report that's awaiting review pulls it back to draft so the
   // reviewer doesn't see a moving target. Logged as an `edited` review
   // action with notes that explain the auto-revert.
   const revertedFromReview =
+    auth.user.role !== "admin" &&
     (existing as unknown as { status: string }).status === "submitted_for_review";
   if (revertedFromReview) {
     update.status = "draft";
   }
 
-  const { error } = await supabase.from("reports").update(update).eq("id", id);
+  let mutation = supabase.from("reports").update(update).eq("id", id).eq("status", existing.status);
+  if (existing.updated_at) mutation = mutation.eq("updated_at", existing.updated_at);
+  const { data: saved, error } = await mutation.select("id").maybeSingle();
   if (error) {
     return NextResponse.json(
       { error: "Failed to update report", details: error.message },
       { status: 500 }
+    );
+  }
+  if (!saved) {
+    return NextResponse.json(
+      { error: "This report changed while saving. Reload it before saving again." },
+      { status: 409 }
     );
   }
 
