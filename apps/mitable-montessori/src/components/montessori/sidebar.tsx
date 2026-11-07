@@ -72,18 +72,26 @@ const TEACHER_DAILY_LOG: NavItem = {
 };
 
 /** Default: Progress first. Report-first puts Reports at the top (no Progress link). */
+const TESTS_NAV: NavItem = {
+  href: "/app/tests",
+  label: "Tests",
+  renderIcon: () => <ClipboardList {...lucide} />,
+};
+
 function teacherNavItems(options: {
   showToday: boolean;
   reportFirst: boolean;
   showGrades: boolean;
   showDailyLog: boolean;
   showProgress: boolean;
+  showTests: boolean;
 }): NavItem[] {
   const grades: NavItem[] = options.showGrades
     ? [{ href: "/app/grades", label: "Grades", renderIcon: () => <GraduationCap {...lucide} /> }]
     : [];
   const dailyLog = options.showDailyLog ? [TEACHER_DAILY_LOG] : [];
   const progress = options.showProgress ? [TEACHER_PROGRESS] : [];
+  const tests = options.showTests ? [TESTS_NAV] : [];
   if (options.reportFirst)
     return [
       TEACHER_REPORTS,
@@ -92,6 +100,7 @@ function teacherNavItems(options: {
       ...dailyLog,
       ...TEACHER_NAV_CORE,
       ...grades,
+      ...tests,
     ];
   const head = options.showToday ? [TEACHER_NAV_LEGACY[0], ...progress] : progress;
   return [
@@ -99,6 +108,7 @@ function teacherNavItems(options: {
     ...dailyLog,
     ...TEACHER_NAV_CORE,
     ...grades,
+    ...tests,
     TEACHER_REPORTS,
     TEACHER_PROJECT_LETTERS,
   ];
@@ -145,8 +155,12 @@ const ADMIN_NAV_CORE: NavItem[] = [
   },
 ];
 
-function adminNavItems(options: { showToday: boolean }): NavItem[] {
-  return options.showToday ? [ADMIN_TODAY, ...ADMIN_NAV_CORE] : ADMIN_NAV_CORE;
+function adminNavItems(options: { showToday: boolean; showTests: boolean }): NavItem[] {
+  return [
+    ...(options.showToday ? [ADMIN_TODAY] : []),
+    ...ADMIN_NAV_CORE,
+    ...(options.showTests ? [TESTS_NAV] : []),
+  ];
 }
 
 export function MontessoriSidebar({
@@ -157,6 +171,7 @@ export function MontessoriSidebar({
   showGradesNav = false,
   showDailyLogNav = false,
   showProgressNav = true,
+  showTestsNav = false,
   userMenuSlot,
 }: {
   schoolName?: string | null;
@@ -171,6 +186,8 @@ export function MontessoriSidebar({
   showDailyLogNav?: boolean;
   /** Hidden when every active assignment is a Toddler classroom. */
   showProgressNav?: boolean;
+  /** Teachers and admins write and mark student tests here. */
+  showTestsNav?: boolean;
   /**
    * Footer slot — renders directly above the bottom of the sidebar. Layouts
    * pass a `<UserMenu variant="row" … />` here; the menu is responsible for
@@ -186,13 +203,14 @@ export function MontessoriSidebar({
     store.reports.filter((r) => r.status === "review").length;
   const navItems =
     variant === "admin"
-      ? adminNavItems({ showToday: showTodayNav })
+      ? adminNavItems({ showToday: showTodayNav, showTests: showTestsNav })
       : teacherNavItems({
           showToday: showTodayNav,
           reportFirst: reportFirstNav,
           showGrades: showGradesNav,
           showDailyLog: showDailyLogNav,
           showProgress: showProgressNav,
+          showTests: showTestsNav,
         });
   return (
     <aside

@@ -21,6 +21,7 @@ import {
   addTodayProgressAndAgent,
   adminTodayEnabled,
   reportFirstExperience,
+  studentTestsEnabled,
   teacherChatAgentEnabled,
 } from "@/lib/feature-flags";
 
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             showGradesNav={showGradesNav}
             showDailyLogNav={showDailyLogNav}
             showProgressNav={showProgressNav}
+            showTestsNav={studentTestsEnabled()}
             userMenuSlot={
               <UserMenu
                 email={ctx.email}
@@ -99,6 +101,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               showGradesNav={showGradesNav}
               showDailyLogNav={showDailyLogNav}
               showProgressNav={showProgressNav}
+              showTestsNav={studentTestsEnabled()}
               showLegacyChat={showChatAgent}
               firstName={ctx.firstName}
               email={ctx.email}
