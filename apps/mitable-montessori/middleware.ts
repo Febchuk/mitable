@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/parents/claim",
   "/parents/login",
+  "/student/login",
   "/api/health",
   "/api/v1/auth",
   // External integrations authenticate in their route handler with an API key,
@@ -50,7 +51,11 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
     const requestedDestination = `${pathname}${request.nextUrl.search}`;
-    url.pathname = pathname.startsWith("/parents/") ? "/parents/login" : "/login";
+    url.pathname = pathname.startsWith("/parents/")
+      ? "/parents/login"
+      : pathname === "/student" || pathname.startsWith("/student/")
+        ? "/student/login"
+        : "/login";
     url.search = "";
     url.searchParams.set("redirect", requestedDestination);
     return withSessionCookies(NextResponse.redirect(url));

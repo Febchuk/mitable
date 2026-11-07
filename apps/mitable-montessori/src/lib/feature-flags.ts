@@ -107,3 +107,11 @@ export function adminExternalApiEnabled(): boolean {
 export function reportAiScoringEnabled(): boolean {
   return readPublicFlag("NEXT_PUBLIC_REPORT_AI_SCORING");
 }
+
+/**
+ * When true, teachers get the Tests section and students can sign in at /student
+ * to sit them. Off by default until a school has tried it.
+ */
+export function studentTestsEnabled(): boolean {
+  return readPublicFlag("NEXT_PUBLIC_STUDENT_TESTS");
+}
