@@ -2,6 +2,7 @@ import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot
 import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
 import { termSkillsSection } from "@/lib/reports/term-skills";
 import { withDirectorComment } from "@/lib/reports/director-comment";
+import { withTermFeedback } from "@/lib/reports/term-feedback";
 import { isElementaryClassroomCode } from "@/lib/app/active-classroom";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -149,7 +150,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       report.sections.push(termSkillsSection());
       report.section_meta["Skills report"] = { type: "term_skills" };
     }
-    const withDirector = withDirectorComment(report.sections, report.section_meta);
+    const feedback = withTermFeedback(report.sections, report.section_meta);
+    const withDirector = withDirectorComment(feedback.sections, feedback.sectionMeta);
     report.sections = withDirector.sections;
     report.section_meta = withDirector.sectionMeta;
   }
@@ -418,7 +420,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             meta?.type === "exam_grades" ||
             meta?.type === "term_history" ||
             meta?.type === "term_skills" ||
-            meta?.type === "director_comment"
+            meta?.type === "director_comment" ||
+            meta?.type === "manual_text"
           ) {
             return {
               id: `s-${i}-${slug}`,
@@ -426,7 +429,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
               paragraphs:
                 meta.type === "term_history" ||
                 meta.type === "term_skills" ||
-                meta.type === "director_comment"
+                meta.type === "director_comment" ||
+                meta.type === "manual_text"
                   ? paragraphsForManualSection(heading)
                   : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
             };
@@ -614,7 +618,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           meta?.type === "exam_grades" ||
           meta?.type === "term_history" ||
           meta?.type === "term_skills" ||
-          meta?.type === "director_comment"
+          meta?.type === "director_comment" ||
+          meta?.type === "manual_text"
         ) {
           return {
             id: `s-${i}-${slug}`,
@@ -622,7 +627,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs:
               meta.type === "term_history" ||
               meta.type === "term_skills" ||
-              meta.type === "director_comment"
+              meta.type === "director_comment" ||
+              meta.type === "manual_text"
                 ? paragraphsForManualSection(heading)
                 : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };
@@ -693,7 +699,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           cur?.type === "exam_grades" ||
           cur?.type === "term_history" ||
           cur?.type === "term_skills" ||
-          cur?.type === "director_comment"
+          cur?.type === "director_comment" ||
+          cur?.type === "manual_text"
         ) {
           return {
             id: `s-${i}-${slug}`,
@@ -701,7 +708,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
             paragraphs:
               cur.type === "term_history" ||
               cur.type === "term_skills" ||
-              cur.type === "director_comment"
+              cur.type === "director_comment" ||
+              cur.type === "manual_text"
                 ? paragraphsForManualSection(heading)
                 : [{ id: `p-${i}-1`, html: htmlForServerFilledSection(heading) }],
           };

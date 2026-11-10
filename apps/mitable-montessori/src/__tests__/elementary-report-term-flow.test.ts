@@ -6,6 +6,7 @@ import { decodeProgressTopic } from "@/lib/reports/progress-topic-payload";
 import { fieldPayloadToReadableText } from "@/lib/reports/template-field-payload";
 import { encodeTermSkills, termSkillsForDisplay } from "@/lib/reports/term-skills";
 import { DIRECTOR_COMMENT_HEADING } from "@/lib/reports/director-comment";
+import { TERM_FEEDBACK_FIELDS } from "@/lib/reports/term-feedback";
 
 const mocks = vi.hoisted(() => ({
   db: null as unknown,
@@ -647,6 +648,81 @@ const patch = (id: string, body: unknown) =>
     new Request("http://localhost/api", { method: "PATCH", body: JSON.stringify(body) }),
     { params: Promise.resolve({ id }) }
   );
+
+it.each([false, true])(
+  "saves, reopens, regenerates and sends teacher and specials feedback (AI drafting: %s)",
+  async (withAgent) => {
+    if (withAgent) {
+      fixture.tables.student_progress_history = [
+        {
+          id: "progress",
+          student_id: CHILD,
+          curriculum_subtopic_id: "beads",
+          new_status: "mastered",
+          comment: "Worked independently.",
+          changed_at: "2027-02-01T09:00:00Z",
+        },
+      ];
+      mocks.agent.mockResolvedValue({
+        draft: {
+          title: "Term report",
+          sections: [{ heading: "Practical Life — Comments", content: "Recorded subject work." }],
+        },
+        references: { refs: [] },
+        turns: 1,
+        regenerations: 0,
+      });
+    }
+    const report = await createReport(FUTURE);
+    const sections = structuredClone(report.sections) as StoredSections;
+    const values = ["Growing in confidence.", "Enjoyed music and art."];
+    TERM_FEEDBACK_FIELDS.forEach((field, index) => {
+      const section = sections.find((section) => section.heading === field.heading)!;
+      expect(section.paragraphs[0].html).toBe("");
+      section.paragraphs[0].html = values[index];
+      section.paragraphs.push({ id: `${field.id}-extra`, html: "A second paragraph." });
+    });
+    expect((await patch(String(report.id), { sections })).status).toBe(200);
+    const reopened = await getReport(String(report.id));
+    for (const field of TERM_FEEDBACK_FIELDS) {
+      expect(reopened?.sections?.find((section) => section.heading === field.heading)).toEqual(
+        sections.find((section) => section.heading === field.heading)
+      );
+    }
+    expect(
+      (
+        await regenerate(req(withAgent ? { notes: ["Recorded work."] } : {}), {
+          params: Promise.resolve({ id: String(report.id) }),
+        })
+      ).status
+    ).toBe(200);
+    if (withAgent) {
+      expect(mocks.agent).toHaveBeenCalledOnce();
+      const draftedHeadings = mocks.agent.mock.calls[0][0].templateSections.map(
+        (section: { heading: string }) => section.heading
+      );
+      for (const field of TERM_FEEDBACK_FIELDS)
+        expect(draftedHeadings).not.toContain(field.heading);
+    } else expect(mocks.agent).not.toHaveBeenCalled();
+    await sendReport(
+      { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+      [],
+      {}
+    );
+    const blocks = buildReportPdfBlocks(
+      report.sections as StoredSections,
+      report.section_meta as Parameters<typeof buildReportPdfBlocks>[1]
+    );
+    TERM_FEEDBACK_FIELDS.forEach((field, index) => {
+      expect(blocks).toContainEqual({
+        kind: "section",
+        heading: field.heading,
+        paragraphs: [{ text: values[index] }, { text: "A second paragraph." }],
+      });
+    });
+    expect(report.status).toBe("sent");
+  }
+);
 
 it("lets an admin add the director's comment separately and keeps it through reopen, regeneration and sending", async () => {
   await saveResults();
