@@ -2,6 +2,7 @@ import { toddlerSendSnapshot } from "@/lib/reports/toddler-send-snapshot";
 import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
 import { termSkillsSection } from "@/lib/reports/term-skills";
 import { withDirectorComment } from "@/lib/reports/director-comment";
+import { withTermFeedback } from "@/lib/reports/term-feedback";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
@@ -325,7 +326,8 @@ export async function POST(req: Request) {
       sections.push(termSkillsSection());
       sectionMeta["Skills report"] = { type: "term_skills" };
     }
-    const withDirector = withDirectorComment(sections, sectionMeta);
+    const feedback = withTermFeedback(sections, sectionMeta);
+    const withDirector = withDirectorComment(feedback.sections, feedback.sectionMeta);
     sections = withDirector.sections;
     sectionMeta = withDirector.sectionMeta;
   }

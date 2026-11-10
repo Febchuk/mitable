@@ -6,6 +6,7 @@ import type { CurriculumStatus } from "@/lib/queries/curriculum";
 import { REPORTABLE_PROGRESS_STATUSES } from "@/lib/progress/marking-schemas";
 import { schemaForStatus, PROGRESS_LEVELS } from "@/lib/progress/marking-schemas";
 import { encodeProgressTopic, type ProgressTopicRow } from "@/lib/reports/progress-topic-payload";
+import { TERM_FEEDBACK_FIELDS } from "@/lib/reports/term-feedback";
 
 /** Legacy sentinel — still accepted when creating reports from old clients. */
 export const DEFAULT_REPORT_TEMPLATE_ID = "__default__";
@@ -116,10 +117,19 @@ export function buildBuiltinReportTemplate(kind: ReportKind): ReportTemplate {
     name: kind === "Major" ? "End-of-term" : kind,
     description: defaultReportTemplateDescription(kind),
     kind,
-    sections: ["Practical Life", "Practical Life — Comments"],
+    sections: [
+      "Practical Life",
+      "Practical Life — Comments",
+      ...(kind === "Major" ? TERM_FEEDBACK_FIELDS.map((field) => field.heading) : []),
+    ],
     sectionMeta: {
       "Practical Life": { type: "progress_topic", topicId: "__preview__" },
       "Practical Life — Comments": { type: "text" },
+      ...(kind === "Major"
+        ? Object.fromEntries(
+            TERM_FEEDBACK_FIELDS.map((field) => [field.heading, { type: "manual_text" as const }])
+          )
+        : {}),
     },
     logoUrl: null,
     iconTone: meta.iconTone,

@@ -69,6 +69,7 @@ export type TemplateSectionRow = z.infer<typeof TemplateSectionRowSchema>;
 
 export type SectionMetaEntry =
   | { type: "text" }
+  | { type: "manual_text" }
   | { type: "hardcoded" }
   | { type: "checklist"; options: string[] }
   | { type: "single_select"; options: string[] }
@@ -81,7 +82,7 @@ export type SectionMetaEntry =
 
 export type SectionMeta = Record<string, SectionMetaEntry>;
 
-/** Sections filled server-side (not sent to the drafting agent as empty prose). */
+/** Sections preserved or filled server-side rather than written by the drafting agent. */
 export function sectionExcludedFromAgent(meta: SectionMetaEntry | undefined): boolean {
   return (
     meta?.type === "hardcoded" ||
@@ -89,6 +90,7 @@ export function sectionExcludedFromAgent(meta: SectionMetaEntry | undefined): bo
     meta?.type === "progress_topic" ||
     meta?.type === "term_history" ||
     meta?.type === "term_skills" ||
+    meta?.type === "manual_text" ||
     meta?.type === "director_comment" ||
     meta?.type === "exam_grades"
   );
