@@ -857,7 +857,8 @@ export function SendToParentsDialog({
       });
       const sendData = (await sendRes.json().catch(() => ({}))) as {
         error?: string;
-        drain?: { sent?: number; failed?: number };
+        drain?: { sent?: number; failed?: number; pending?: number };
+        publication?: { unchanged?: boolean; queued?: number };
       };
       if (!sendRes.ok) {
         setError(sendData.error || "Couldn't send report.");
@@ -865,7 +866,12 @@ export function SendToParentsDialog({
       }
       const sentCount = sendData.drain?.sent ?? selected.size;
       ToastBus.push({
-        message: `Report notification sent to ${sentCount} guardian${sentCount === 1 ? "" : "s"}.`,
+        message:
+          sentCount > 0
+            ? `Report notification sent to ${sentCount} guardian${sentCount === 1 ? "" : "s"}.`
+            : sendData.drain?.pending
+              ? "Report shared. Email delivery is still being confirmed."
+              : "This version was already shared. No repeat email was sent.",
       });
       onSent();
     } catch {
@@ -887,6 +893,8 @@ export function SendToParentsDialog({
               <DialogTitle>Send report to parents</DialogTitle>
               <DialogDescription>
                 Choose which of {firstName}&apos;s guardians should receive this report by email.
+                Saving a draft does not notify parents. Sending an unchanged version does not send a
+                repeat email.
               </DialogDescription>
             </DialogHeader>
 

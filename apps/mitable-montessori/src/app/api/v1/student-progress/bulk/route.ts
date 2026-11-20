@@ -53,6 +53,7 @@ export async function POST(req: Request) {
     supabase
       .from("curriculum_subtopics")
       .select("id, curriculum_topics!inner(curriculum_id, marking_schema)")
+      .eq("is_active", true)
       .in("id", subtopicIds),
   ]);
   const topicBySubtopic = new Map(

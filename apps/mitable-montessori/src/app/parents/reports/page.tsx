@@ -1,3 +1,4 @@
+import { listPublishedReports } from "@/lib/parents/published-reports";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -15,21 +16,7 @@ export default async function ParentReportsPage({
   if (!child) notFound();
 
   const supabase = createClient(await cookies());
-  const { data } = await supabase
-    .from("reports")
-    .select("id, report_type, period_start, period_end, title, sent_at")
-    .eq("student_id", child.id)
-    .eq("status", "sent")
-    .order("sent_at", { ascending: false })
-    .limit(50);
-  const reports = (data ?? []) as Array<{
-    id: string;
-    report_type: "daily" | "major" | "incident" | "sen" | "project";
-    period_start: string | null;
-    period_end: string | null;
-    title: string | null;
-    sent_at: string | null;
-  }>;
+  const reports = await listPublishedReports(supabase, child.id);
 
   return (
     <div className="max-w-3xl">

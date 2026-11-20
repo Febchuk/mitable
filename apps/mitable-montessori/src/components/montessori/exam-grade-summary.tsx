@@ -5,39 +5,49 @@ export function ExamGradeSummary({ summary }: { summary: ExamGradeReportSummary 
   return (
     <div className="space-y-4 text-sm">
       {summary.rows?.length ? (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[480px] text-left">
-            <thead className="bg-muted text-xs text-ink-secondary">
-              <tr>
-                {["Subject", "CA /40", "Class participation /20", "AFL /40", "Total /100"].map(
-                  (label) => (
-                    <th key={label} className="px-3 py-2">
-                      {label}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {summary.rows.map((row, index) => (
-                <tr key={`${row.subject}-${row.assessmentName}-${index}`}>
-                  <th scope="row" className="px-3 py-2 font-medium">
-                    {row.subject}
-                    <span className="block text-xs font-normal text-ink-secondary">
-                      {row.assessmentName}
-                    </span>
-                  </th>
-                  {[row.caScore, row.classParticipationScore, row.aflScore, row.total].map(
-                    (score, index) => (
-                      <td key={index} className="px-3 py-2">
-                        {score ?? "—"}
-                      </td>
+        <div>
+          <p className="mb-2 text-xs text-ink-muted sm:hidden">
+            Swipe the table to see all scores.
+          </p>
+          <div
+            role="region"
+            aria-label="Exam grade scores"
+            tabIndex={0}
+            className="overflow-x-auto rounded-lg border border-border"
+          >
+            <table className="w-full min-w-[480px] text-left">
+              <thead className="bg-muted text-xs text-ink-secondary">
+                <tr>
+                  {["Subject", "CA /40", "Class participation /20", "AFL /40", "Total /100"].map(
+                    (label) => (
+                      <th key={label} className="px-3 py-2">
+                        {label}
+                      </th>
                     )
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {summary.rows.map((row, index) => (
+                  <tr key={`${row.subject}-${row.assessmentName}-${index}`}>
+                    <th scope="row" className="px-3 py-2 font-medium">
+                      {row.subject}
+                      <span className="block text-xs font-normal text-ink-secondary">
+                        {row.assessmentName}
+                      </span>
+                    </th>
+                    {[row.caScore, row.classParticipationScore, row.aflScore, row.total].map(
+                      (score, index) => (
+                        <td key={index} className="px-3 py-2">
+                          {score ?? "—"}
+                        </td>
+                      )
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
       <div className="rounded-lg border border-border p-3">

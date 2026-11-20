@@ -1,3 +1,4 @@
+import { reportMemoryDb } from "./helpers/report-memory-db";
 /**
  * Phase 4 checkpoint end-to-end test.
  *
@@ -71,109 +72,6 @@ function buildStubAnthropic(turns: StubTurn[]) {
       },
     },
   };
-}
-
-function buildFakeSupabase(initial?: {
-  reports?: Array<{
-    id: string;
-    status: string;
-    title?: string;
-    body?: string;
-    student?: { id: string; firstName: string; lastName: string; schoolName: string };
-  }>;
-  recipients?: Array<{
-    id: string;
-    report_id: string;
-    guardian_id: string;
-    email_snapshot: string | null;
-    delivery_status: string;
-  }>;
-}) {
-  const reports = new Map(
-    initial?.reports?.map((r) => [r.id, { ...r, title: r.title ?? "T", body: r.body ?? "B" }])
-  );
-  const recipients = new Map(initial?.recipients?.map((r) => [r.id, { ...r }]) ?? []);
-  const writes: Array<{ table: string; payload: unknown }> = [];
-
-  const fake = {
-    from(table: string) {
-      if (table === "report_recipients") {
-        return {
-          select() {
-            return {
-              eq: (_col: string, val: string) => ({
-                limit: async () => {
-                  const rows = Array.from(recipients.values())
-                    .filter((r) => r.delivery_status === val)
-                    .map((r) => {
-                      const rep = reports?.get(r.report_id);
-                      return {
-                        id: r.id,
-                        report_id: r.report_id,
-                        guardian_id: r.guardian_id,
-                        email_snapshot: r.email_snapshot,
-                        reports: rep
-                          ? {
-                              title: rep.title,
-                              body: rep.body,
-                              status: rep.status,
-                              students: rep.student
-                                ? {
-                                    id: rep.student.id,
-                                    first_name: rep.student.firstName,
-                                    last_name: rep.student.lastName,
-                                    schools: { name: rep.student.schoolName },
-                                  }
-                                : null,
-                            }
-                          : null,
-                      };
-                    });
-                  return { data: rows, error: null };
-                },
-              }),
-            };
-          },
-          update(patch: Record<string, unknown>) {
-            return {
-              eq: async (_col: string, val: string) => {
-                const r = recipients.get(val);
-                if (r) Object.assign(r, patch);
-                return { error: null };
-              },
-            };
-          },
-        };
-      }
-      if (table === "students") {
-        return {
-          update(_patch: Record<string, unknown>) {
-            return {
-              eq: () => ({
-                eq: async () => ({ error: null }),
-              }),
-            };
-          },
-        };
-      }
-      writes.push({ table, payload: null });
-      return {
-        insert(payload: unknown) {
-          writes.push({ table, payload });
-          return {
-            select: () => ({
-              single: async () => ({
-                data: { id: `${table}-${writes.length}` },
-                error: null,
-              }),
-            }),
-          };
-        },
-      };
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
-  return { fake, reports, recipients, writes };
 }
 
 describe("Phase 4 — admin agent + tokenization", () => {
@@ -405,46 +303,47 @@ describe("Phase 4 — CSV roster import planner", () => {
 
 describe("Phase 4 — email worker", () => {
   it("drains 'pending' for 'sent' reports and skips wrong-state reports", async () => {
-    const { fake } = buildFakeSupabase({
-      reports: [
-        {
-          id: "r-ok",
+    const sender = new StubEmailSender();
+    const queued = [
+      {
+        id: "r1",
+        guardian_id: "g-1",
+        email_snapshot: "parent@example.test",
+        delivery_status: "pending",
+        attempts: 0,
+        reports: {
           status: "sent",
-          student: {
+          report_type: "daily",
+          report_date: "2026-11-19",
+          students: {
             id: STUDENT_ID,
-            firstName: "Maya",
-            lastName: "Singh",
-            schoolName: "Harbour Learning Place",
+            first_name: "Test",
+            last_name: "Child",
+            schools: { name: "Harbour Learning Place" },
           },
         },
-        { id: "r-not-ready", status: "approved" },
-      ],
-      recipients: [
-        {
-          id: "rec-1",
-          report_id: "r-ok",
-          guardian_id: "g-1",
-          email_snapshot: "g1@example.com",
-          delivery_status: "pending",
-        },
-        {
-          id: "rec-2",
-          report_id: "r-not-ready",
-          guardian_id: "g-2",
-          email_snapshot: "g2@example.com",
-          delivery_status: "pending",
-        },
-        {
-          id: "rec-3",
-          report_id: "r-ok",
-          guardian_id: "g-3",
-          email_snapshot: null,
-          delivery_status: "pending",
-        },
-      ],
-    });
-    const sender = new StubEmailSender();
-    const result = await drainPendingReports(fake, sender);
+      },
+      {
+        id: "r2",
+        guardian_id: "g-2",
+        email_snapshot: "other@example.test",
+        delivery_status: "pending",
+        attempts: 0,
+        reports: { status: "draft" },
+      },
+      {
+        id: "r3",
+        guardian_id: "g-3",
+        email_snapshot: null,
+        delivery_status: "pending",
+        attempts: 0,
+        reports: { status: "sent" },
+      },
+    ];
+    const result = await drainPendingReports(
+      reportMemoryDb({ report_recipients: queued }).db,
+      sender
+    );
 
     expect(result.attempted).toBe(3);
     expect(result.sent).toBe(1);

@@ -6,7 +6,11 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { toAdminTemplateDto } from "@/lib/report-templates/admin-dto";
-import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/sections";
+import {
+  DefaultClassroomGroupSchema,
+  rowsToDb,
+  TemplateSectionsSchema,
+} from "@/lib/report-templates/sections";
 
 const LOGO_BUCKET = "report-template-logos";
 
@@ -28,6 +32,7 @@ async function removeLogoObjectIfAny(
 }
 
 const UpdateTemplateSchema = z.object({
+  defaultFor: DefaultClassroomGroupSchema.optional(),
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(400).nullable().optional(),
   kind: z.enum(["Daily", "Major", "Incident"]).optional(),
@@ -56,7 +61,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { data, error } = await supabase
     .from("report_templates")
     .select(
-      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, reporting_period, context_mode_default, created_at, updated_at"
+      "id, default_for, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, reporting_period, context_mode_default, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -103,6 +108,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (parsed.data.defaultFor !== undefined) update.default_for = parsed.data.defaultFor;
   if (parsed.data.name !== undefined) update.name = parsed.data.name;
   if (parsed.data.description !== undefined) update.description = parsed.data.description;
   if (parsed.data.kind !== undefined) update.kind = parsed.data.kind;
@@ -128,7 +134,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { error } = await supabase.from("report_templates").update(update).eq("id", id);
   if (error) {
     return NextResponse.json(
-      { error: "Failed to update template", details: error.message },
+      {
+        error:
+          error.code === "23505"
+            ? "A default already exists for these classrooms. Edit that template or remove its default assignment first."
+            : "Failed to update template",
+        details: error.message,
+      },
       { status: 500 }
     );
   }

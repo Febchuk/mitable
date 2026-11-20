@@ -119,5 +119,66 @@ export function reportMemoryDb(tables: Record<string, Row[]>) {
     };
     return q;
   };
-  return { db: { from } as unknown as SupabaseClient, tables, failures };
+  return {
+    db: {
+      from,
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        if (name !== "publish_report") return { data: null, error: { message: "Unknown RPC" } };
+        const report = tables.reports.find((row) => row.id === args.p_report_id);
+        if (!report) return { data: null, error: { message: "Report not found" } };
+        // RPC transaction/authorization/deduplication are verified separately against Postgres.
+        if (report.status === "sent")
+          return {
+            data: {
+              reportId: report.id,
+              publicationId: "existing",
+              queued: 0,
+              alreadySent: 1,
+              unchanged: true,
+            },
+            error: null,
+          };
+        Object.assign(report, args.p_snapshot, {
+          status: "sent",
+          sent_at: new Date().toISOString(),
+        });
+        const publicationId = crypto.randomUUID();
+        (tables.report_publications ??= []).push({
+          id: publicationId,
+          report_id: report.id,
+          student_id: report.student_id,
+          snapshot: structuredClone(args.p_snapshot),
+          published_at: report.sent_at,
+        });
+        for (const guardianId of args.p_guardian_ids as string[]) {
+          const link = (tables.student_guardians ?? []).find(
+            (row) => row.guardian_id === guardianId
+          );
+          const guardian = link?.guardians as Row | undefined;
+          (tables.report_recipients ??= []).push({
+            id: crypto.randomUUID(),
+            report_id: report.id,
+            publication_id: publicationId,
+            guardian_id: guardianId,
+            email_snapshot: guardian?.email ?? "parent@example.test",
+            message_body: args.p_message_body,
+            delivery_status: "pending",
+            attempts: 0,
+          });
+        }
+        return {
+          data: {
+            reportId: report.id,
+            publicationId,
+            queued: (args.p_guardian_ids as string[]).length,
+            alreadySent: 0,
+            unchanged: false,
+          },
+          error: null,
+        };
+      },
+    } as unknown as SupabaseClient,
+    tables,
+    failures,
+  };
 }

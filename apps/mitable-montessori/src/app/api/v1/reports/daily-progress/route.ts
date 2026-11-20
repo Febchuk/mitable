@@ -488,7 +488,7 @@ export async function POST(req: Request) {
 
         if (!reportId) throw new Error("Couldn't prepare report");
         const guardianEmailMap = Object.fromEntries(guardianRows.map((g) => [g.id, g.email]));
-        await sendReport(
+        const publication = await sendReport(
           { supabase, reportId, actorUserId: auth.user.userId },
           guardianRows.map((g) => g.id),
           guardianEmailMap
@@ -501,8 +501,10 @@ export async function POST(req: Request) {
           target_id: reportId,
           metadata: { recipient_count: guardianRows.length, source: "progress_batch" },
         });
-        const drain = await drainPendingReports(supabase, sender, { reportId });
-        if (drain.failed > 0) {
+        const drain = await drainPendingReports(supabase, sender, {
+          reportId: publication.reportId,
+        });
+        if (drain.failed > 0 || drain.needsReview > 0) {
           throw new Error(
             drain.sent > 0
               ? `${drain.sent} delivered, ${drain.failed} failed`

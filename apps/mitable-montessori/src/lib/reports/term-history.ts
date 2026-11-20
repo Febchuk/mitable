@@ -14,7 +14,8 @@ type SharedReport = {
   sections: Section[] | null;
   section_meta: SectionMeta | null;
 };
-const TYPES = ["daily", "sen", "incident", "project"];
+export type TermHistoryReportType = "daily" | "sen" | "incident" | "project";
+const TYPES: TermHistoryReportType[] = ["incident"];
 const LABELS: Record<string, string> = {
   daily: "Daily reports",
   sen: "SEN reports",
@@ -30,7 +31,8 @@ export async function buildTermHistorySections(
     studentId: string;
     periodStart: string;
     periodEnd: string;
-  }
+  },
+  types: TermHistoryReportType[] = TYPES
 ): Promise<{ sections: Section[]; sectionMeta: SectionMeta }> {
   const reports: SharedReport[] = [];
   const size = 200;
@@ -43,7 +45,7 @@ export async function buildTermHistorySections(
       .eq("student_id", scope.studentId)
       .eq("students.school_id", scope.schoolId)
       .eq("status", "sent")
-      .in("report_type", TYPES)
+      .in("report_type", types)
       .gte("report_date", scope.periodStart)
       .lte("report_date", scope.periodEnd)
       .order("report_date")
@@ -56,7 +58,7 @@ export async function buildTermHistorySections(
   }
   const sections: Section[] = [];
   const sectionMeta: SectionMeta = {};
-  for (const type of TYPES) {
+  for (const type of types) {
     const sources = reports.filter((report) => report.report_type === type);
     if (!sources.length) continue;
     const heading = `${LABELS[type]} — term highlights`;
@@ -144,4 +146,43 @@ export function mergeTermHistory(
     );
   }
   return { sections, sectionMeta: { ...sectionMeta, ...built.sectionMeta } };
+}
+
+/** Refresh just the sources chosen by the admin, retaining layout and teacher paragraphs. */
+export async function refreshConfiguredTermHistory(
+  db: SupabaseClient,
+  scope: Parameters<typeof buildTermHistorySections>[1],
+  sections: Section[],
+  sectionMeta: SectionMeta
+): Promise<Section[]> {
+  const history = sections.filter(
+    (section) => sectionMeta[section.heading]?.type === "term_history"
+  );
+  if (!history.length) return sections;
+  const types = [
+    ...new Set(
+      history.map((section) => {
+        const meta = sectionMeta[section.heading];
+        return meta.type === "term_history" ? (meta.reportType ?? "incident") : "incident";
+      })
+    ),
+  ];
+  const built = await buildTermHistorySections(db, scope, types);
+  return sections.map((section) => {
+    const meta = sectionMeta[section.heading];
+    if (meta?.type !== "term_history") return section;
+    const source = built.sections.find(
+      (item) => item.id === `term-history-${meta.reportType ?? "incident"}`
+    );
+    return {
+      ...section,
+      paragraphs: [
+        {
+          id: section.paragraphs[0]?.id ?? `${section.id}-value`,
+          html: source?.paragraphs[0].html ?? "",
+        },
+        ...section.paragraphs.slice(1),
+      ],
+    };
+  });
 }

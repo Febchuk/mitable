@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { AuthHero, AuthHeroMobile } from "@/components/auth/auth-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { safeParentRedirect } from "@/lib/parents/redirect";
 import { passwordResetAudience } from "@/lib/auth/password-reset";
 import { createClient } from "@/utils/supabase/client";
 
@@ -22,8 +23,11 @@ function UpdatePasswordInner() {
   const router = useRouter();
   const params = useSearchParams();
   const audience = passwordResetAudience(params.get("audience"));
+  const destination = audience === "parent" ? safeParentRedirect(params.get("redirect")) : null;
   const loginHref =
-    audience === "parent" ? "/parents/login?password=updated" : "/login?password=updated";
+    audience === "parent"
+      ? `/parents/login?password=updated${destination ? `&redirect=${encodeURIComponent(destination)}` : ""}`
+      : "/login?password=updated";
   const [password, setPassword] = React.useState("");
   const [confirmation, setConfirmation] = React.useState("");
   const [showPasswords, setShowPasswords] = React.useState(false);

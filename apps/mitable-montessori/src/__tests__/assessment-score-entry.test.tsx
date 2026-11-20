@@ -16,6 +16,8 @@ const data: ElementaryGradesPageData = {
   students: [{ id: "child", classroomId: "room", name: "Test Student" }],
   grades: [],
   termComments: [],
+  subjects: [{ classroomId: "room", name: "Math" }],
+  gradingScale: null,
 };
 const fetchMock = vi.fn();
 beforeEach(() => {
@@ -97,21 +99,21 @@ it("opens a legacy result as a total without assigning invented component values
   expect(screen.queryByLabelText("CA /40")).toBeNull();
   expect(screen.getByText("Saved total only — no breakdown recorded")).toBeTruthy();
 });
-it("saves the teacher-selected overall grade with one comment", async () => {
+it("saves a term comment without allowing a manual overall letter", async () => {
   fetchMock.mockResolvedValue(
-    Response.json({ comment: "A productive term.", overallGradeLabel: "B" })
+    Response.json({ comment: "A productive term.", overallGradeLabel: null })
   );
   render(<GradesClient initialData={data} />);
-  fireEvent.change(screen.getByLabelText("Overall grade"), { target: { value: "B" } });
+  expect(screen.queryByRole("combobox", { name: "Overall grade" })).toBeNull();
+  expect(screen.getByText(/An admin can set the A–D/)).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Comments"), { target: { value: "A productive term." } });
-  fireEvent.click(screen.getByRole("button", { name: "Save overall grade and comment" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save comment" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
-  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
-    overallGradeLabel: "B",
-    comment: "A productive term.",
-    termId: "term",
-  });
+  const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(payload).toMatchObject({ comment: "A productive term.", termId: "term" });
+  expect(payload).not.toHaveProperty("overallGradeLabel");
 });
+
 it("renders subject numbers and only one overall letter in the report", () => {
   render(
     <ExamGradeSummary
@@ -136,4 +138,38 @@ it("renders subject numbers and only one overall letter in the report", () => {
   expect(screen.getByRole("columnheader", { name: "Total /100" })).toBeTruthy();
   expect(screen.getByText(/Overall average: 66.5% · Overall grade: B/)).toBeTruthy();
   expect(screen.queryByRole("columnheader", { name: /grade/i })).toBeNull();
+});
+it("uses the curriculum subject dropdown and calculates the overall grade from saved scores", () => {
+  render(
+    <GradesClient
+      initialData={{
+        ...data,
+        gradingScale: { aMin: 80, bMin: 65, cMin: 50 },
+        grades: [70, 65].map((percentage, index) => ({
+          id: `grade-${index}`,
+          classroomId: "room",
+          studentId: "child",
+          termId: "term",
+          subject: index ? "Science" : "Math",
+          assessmentName: "Exam",
+          percentage,
+          gradeLabel: "",
+          comments: null,
+          updatedAt: "now",
+        })),
+      }}
+    />
+  );
+  expect(screen.getByRole("combobox", { name: "Subject" }).tagName).toBe("SELECT");
+  expect(screen.getByLabelText("Overall average").textContent).toBe("67.5%");
+  expect(screen.getByLabelText("Overall grade").textContent).toBe("B");
+});
+it("does not allow grade entry when the classroom has no curriculum subjects", () => {
+  render(<GradesClient initialData={{ ...data, subjects: [] }} />);
+  expect((screen.getByRole("combobox", { name: /Subject/ }) as HTMLSelectElement).disabled).toBe(
+    true
+  );
+  expect((screen.getByRole("button", { name: "Add grade" }) as HTMLButtonElement).disabled).toBe(
+    true
+  );
 });

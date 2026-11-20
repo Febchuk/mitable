@@ -1,5 +1,6 @@
+import { loadPublishedReport } from "@/lib/parents/published-reports";
+import { ReportAccessHelp } from "@/components/parents/report-access-help";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getParentPortalContext, selectedParentChild } from "@/lib/parents/portal";
 import { createClient } from "@/utils/supabase/server";
@@ -16,23 +17,17 @@ export default async function ParentReportDetailPage({
   params: Promise<{ reportId: string }>;
   searchParams: Promise<{ child?: string }>;
 }) {
-  const portal = await getParentPortalContext();
-  if (!portal) redirect("/parents/login");
-  const child = selectedParentChild(portal.children, (await searchParams).child);
-  if (!child) notFound();
   const { reportId } = await params;
-
+  const requestedChild = (await searchParams).child;
+  const destination = `/parents/reports/${encodeURIComponent(reportId)}${requestedChild ? `?child=${encodeURIComponent(requestedChild)}` : ""}`;
+  const portal = await getParentPortalContext();
+  if (!portal) return <ReportAccessHelp destination={destination} />;
   const supabase = createClient(await cookies());
-  const { data: report } = await supabase
-    .from("reports")
-    .select(
-      "id, report_type, period_start, period_end, title, body, sent_at, sections, section_meta, toddler_daily_log_id"
-    )
-    .eq("id", reportId)
-    .eq("student_id", child.id)
-    .eq("status", "sent")
-    .maybeSingle();
-  if (!report) notFound();
+  const report = await loadPublishedReport(supabase, reportId);
+  if (!report) return <ReportAccessHelp destination={destination} />;
+  const child = selectedParentChild(portal.children, requestedChild ?? report.student_id);
+  if (!child || child.id !== report.student_id)
+    return <ReportAccessHelp destination={destination} />;
   const media = await listToddlerReportMedia(
     createAdminClient(),
     report.toddler_daily_log_id as string | null
@@ -70,7 +65,8 @@ export default async function ParentReportDetailPage({
           blocks={blocks}
           fallbackBody={report.body || "This report does not include written notes."}
           media={media}
-          schoolName={portal.schoolName}
+          schoolName={report.school_name ?? portal.schoolName}
+          logoUrl={report.template_logo_url}
         />
       </div>
     </div>

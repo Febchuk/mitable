@@ -36,4 +36,16 @@ describe("password reset routing", () => {
     expect(safeAuthRedirect("//attacker.example/reset")).toBe("/");
     expect(safeAuthRedirect("/\\attacker.example/reset")).toBe("/");
   });
+
+  it("preserves the original parent report through recovery and rejects an external destination", () => {
+    const callback = new URL(
+      passwordResetCallbackUrl("http://localhost", "parent", "/parents/reports/qa?child=child")
+    );
+    const update = new URL(callback.searchParams.get("redirect")!, callback.origin);
+    expect(update.pathname).toBe("/update-password");
+    expect(update.searchParams.get("redirect")).toBe("/parents/reports/qa?child=child");
+    expect(
+      passwordResetCallbackUrl("http://localhost", "parent", "https://attacker.example")
+    ).not.toContain("attacker");
+  });
 });

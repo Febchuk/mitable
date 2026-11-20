@@ -1,3 +1,4 @@
+import { reportMemoryDb } from "./helpers/report-memory-db";
 import { beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -79,7 +80,9 @@ vi.mock("@/lib/app/active-classroom", () => ({
   resolveClassroomForCurrentUser: async () => ({ id: state.classroom }),
 }));
 vi.mock("@/utils/supabase/server", () => ({ createClient: () => ({ from }) }));
-vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => ({ from }) }));
+vi.mock("@/utils/supabase/admin", () => ({
+  createAdminClient: () => ({ from, rpc: reportMemoryDb(state.tables).db.rpc }),
+}));
 vi.mock("@/lib/audit/log", () => ({ auditLog: vi.fn() }));
 vi.mock("@/lib/queries/reports", () => ({ getReport: async () => ({ reportType: "sen" }) }));
 vi.mock("@/lib/admin/email-worker", () => ({
@@ -157,7 +160,7 @@ it("saves an SEN assessment, prepares a draft, then sends it to an eligible pare
   const sent = await send(request({ reportId, guardianRefs: [state.guardian] }));
   expect(sent.status).toBe(200);
   expect(state.tables.reports[0].status).toBe("sent");
-  expect(state.tables.report_recipients).toEqual([
+  expect(state.tables.report_recipients).toMatchObject([
     expect.objectContaining({
       report_id: reportId,
       guardian_id: state.guardian,

@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { removeCurriculumSubject } from "@/lib/admin/crud";
 import { adminWriteRoute } from "@/lib/admin/route-helper";
 import { CreateCurriculumSubjectSchema, UpdateCurriculumSubjectSchema } from "@/lib/schemas/admin";
 import {
@@ -30,6 +32,18 @@ export async function PATCH(req: Request) {
       }
       await reorderCurriculumSubjects(ctx, input.curriculum_id, input.subject_ids);
       return { id: input.curriculum_id, meta: { action: input.action } };
+    }
+  );
+}
+
+export async function DELETE(req: Request) {
+  return adminWriteRoute(
+    req,
+    z.object({ subject_id: z.string().uuid() }),
+    "admin_remove_curriculum_subject",
+    async (input, ctx) => {
+      await removeCurriculumSubject(ctx, input.subject_id);
+      return { id: input.subject_id };
     }
   );
 }

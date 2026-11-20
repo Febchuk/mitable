@@ -7,14 +7,7 @@ import { auditLog } from "@/lib/audit/log";
 
 const LOGO_BUCKET = "report-template-logos";
 const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"]);
-
-function storagePathFromPublicUrl(url: string): string | null {
-  const marker = `/${LOGO_BUCKET}/`;
-  const i = url.indexOf(marker);
-  if (i < 0) return null;
-  return decodeURIComponent(url.slice(i + marker.length));
-}
+const ALLOWED = new Set(["image/png", "image/jpeg"]);
 
 function extForMime(mime: string): string {
   if (mime === "image/png") return "png";
@@ -53,13 +46,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const mime = file.type || "application/octet-stream";
   if (!ALLOWED.has(mime)) {
-    return NextResponse.json({ error: "Use PNG, JPG, WebP, GIF, or SVG" }, { status: 400 });
-  }
-
-  const oldUrl = (existing.logo_url as string | null) ?? null;
-  const oldPath = oldUrl ? storagePathFromPublicUrl(oldUrl) : null;
-  if (oldPath) {
-    await admin.storage.from(LOGO_BUCKET).remove([oldPath]);
+    return NextResponse.json({ error: "Use PNG or JPG" }, { status: 400 });
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
@@ -88,6 +75,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       { status: 500 }
     );
   }
+
+  // Keep previous logo objects: shared reports and copied templates can still
+  // reference them. Replacing branding must not break an already-sent report.
 
   await auditLog({
     actor_id: auth.user.userId,
@@ -118,18 +108,14 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (!existing || (existing.school_id as string) !== auth.user.schoolId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const url = (existing.logo_url as string | null) ?? null;
-  const path = url ? storagePathFromPublicUrl(url) : null;
-  if (path) {
-    await admin.storage.from(LOGO_BUCKET).remove([path]);
-  }
-
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
-  await supabase
+  const { error: clearError } = await supabase
     .from("report_templates")
     .update({ logo_url: null, updated_at: new Date().toISOString() })
     .eq("id", templateId);
+  if (clearError) return NextResponse.json({ error: "Could not remove the logo" }, { status: 500 });
+  // Clear the template's choice while preserving logos on published reports.
 
   await auditLog({
     actor_id: auth.user.userId,

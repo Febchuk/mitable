@@ -1,3 +1,4 @@
+import { reportMemoryDb } from "./helpers/report-memory-db";
 import { drainOnce } from "@/lib/sync/worker";
 
 /** Test-only re-export so the e2e test can drive the sync drain deterministically
@@ -10,59 +11,22 @@ export const drainOnceForTest = drainOnce;
  * mock — only the chained methods used in workflow.ts are honored.
  */
 function buildFakeSupabase(initialReport: { id: string; status: string }) {
-  const reports = new Map([[initialReport.id, { ...initialReport }]]);
-  const reviewActions: Array<{ report_id: string; action_type: string }> = [];
-  const recipients: Array<{ report_id: string; guardian_id: string }> = [];
-
-  const fake = {
-    from(table: string) {
-      if (table === "reports") {
-        return {
-          select() {
-            return {
-              eq: (_col: string, val: string) => ({
-                maybeSingle: async () => {
-                  const r = reports.get(val);
-                  if (!r) return { data: null, error: null };
-                  return { data: r, error: null };
-                },
-              }),
-            };
-          },
-          update(patch: Record<string, unknown>) {
-            return {
-              eq: async (_col: string, val: string) => {
-                const r = reports.get(val);
-                if (!r) return { error: { message: "Report not found" } };
-                Object.assign(r, patch);
-                return { error: null };
-              },
-            };
-          },
-        };
-      }
-      if (table === "report_review_actions") {
-        return {
-          insert: async (row: { report_id: string; action_type: string }) => {
-            reviewActions.push(row);
-            return { error: null };
-          },
-        };
-      }
-      if (table === "report_recipients") {
-        return {
-          insert: async (rows: Array<{ report_id: string; guardian_id: string }>) => {
-            recipients.push(...rows);
-            return { error: null };
-          },
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
-
-  return { fake, reports, reviewActions, recipients };
+  const memory = reportMemoryDb({
+    reports: [{ ...initialReport }],
+    report_review_actions: [],
+    report_recipients: [],
+    classrooms: [],
+    schools: [],
+    students: [],
+  });
+  const report = memory.tables.reports[0];
+  const reports = new Map([[initialReport.id, report]]);
+  return {
+    fake: memory.db,
+    reports,
+    reviewActions: memory.tables.report_review_actions,
+    recipients: memory.tables.report_recipients,
+  };
 }
 
 const REPORT_ID = "99999999-9999-9999-9999-999999999999";

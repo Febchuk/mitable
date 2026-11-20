@@ -1,3 +1,4 @@
+import { activeCurriculumTree } from "@/lib/curriculum/active-tree";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { resolveClassroomForCurrentUser } from "@/lib/app/active-classroom";
@@ -423,9 +424,9 @@ export async function getClassroomProgress(
   const treeResp = await supabase
     .from("curriculum_subjects")
     .select(
-      "id, name, sort_order, " +
-        "curriculum_topics(id, name, sort_order, marking_schema, " +
-        "curriculum_subtopics(id, name, sort_order))"
+      "id, name, sort_order, is_active, " +
+        "curriculum_topics(id, name, sort_order, is_active, marking_schema, " +
+        "curriculum_subtopics(id, name, sort_order, is_active))"
     )
     .eq("curriculum_id", curriculumId)
     .returns<SubjectDbRow[]>();
@@ -434,7 +435,7 @@ export async function getClassroomProgress(
   const topics: ClassroomProgressTopic[] = [];
   const subtopics: ClassroomProgressSubtopic[] = [];
 
-  for (const subj of treeResp.data ?? []) {
+  for (const subj of activeCurriculumTree(treeResp.data ?? [])) {
     subjects.push({ id: subj.id, name: subj.name, sortOrder: subj.sort_order });
     for (const t of subj.curriculum_topics) {
       topics.push({

@@ -41,10 +41,8 @@ export async function elementaryGradeSnapshot(
     studentId: report.student_id,
     termId: report.term_id,
   };
-  const [grades, feedback] = await Promise.all([
-    listStudentExamGradesForTerm(scope),
-    getStudentTermGradeFeedback(scope),
-  ]);
+  const grades = await listStudentExamGradesForTerm(scope);
+  const feedback = await getStudentTermGradeFeedback(scope, grades);
   const html = encodeExamGrades(
     summarizeExamGrades(grades, feedback.comment, {
       includeBreakdown: true,

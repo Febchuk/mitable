@@ -1,5 +1,6 @@
 import {
   dbToRows,
+  type DefaultClassroomGroup,
   type SectionMeta,
   type TemplateSectionRow,
 } from "@/lib/report-templates/sections";
@@ -47,6 +48,7 @@ export type ContextModeDefault = "history" | "input_only";
 
 export type AdminReportTemplateDto = {
   id: string;
+  defaultFor: DefaultClassroomGroup | null;
   name: string;
   description: string | null;
   kind: string;
@@ -70,6 +72,7 @@ export function toAdminTemplateDto(row: Record<string, unknown>): AdminReportTem
   const sectionMeta = (row.section_meta as SectionMeta | null) ?? {};
   return {
     id: row.id as string,
+    defaultFor: (row.default_for as DefaultClassroomGroup | null) ?? null,
     name: row.name as string,
     description: (row.description as string | null) ?? null,
     kind: row.kind as string,

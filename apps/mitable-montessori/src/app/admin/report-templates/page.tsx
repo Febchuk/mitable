@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { GradingScaleSettings } from "./grading-scale-settings";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Copy, Pencil, Trash2 } from "lucide-react";
@@ -94,7 +95,7 @@ export default function AdminReportTemplatesPage() {
     <div>
       <PageHeader
         title="Report templates"
-        subtitle="Define section structure, assistant guidance, tone, and an optional school logo. Duplicate a row to start from an existing template."
+        subtitle="Set your grading scale and choose the fields, order and logo for your school’s reports."
         actions={
           <Button asChild>
             <Link href="/admin/report-templates/new">New template</Link>
@@ -103,6 +104,12 @@ export default function AdminReportTemplatesPage() {
       />
 
       <div style={{ padding: "24px" }}>
+        <GradingScaleSettings />
+        <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 6px" }}>Report layouts</h2>
+        <p className="mb-4 text-sm text-ink-secondary">
+          Classroom defaults are used automatically for new end-of-term reports. Edit one to change
+          its fields, order or logo.
+        </p>
         {loading ? (
           <p style={{ color: "var(--color-ink-muted)", fontSize: 14 }}>Loading…</p>
         ) : templates.length === 0 ? (
@@ -111,96 +118,120 @@ export default function AdminReportTemplatesPage() {
           </p>
         ) : (
           <div style={{ ...cardStyle }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--color-border)", textAlign: "left" }}>
-                  <th
-                    style={{
-                      padding: "12px 16px",
-                      fontWeight: 600,
-                      color: "var(--color-ink-muted)",
-                    }}
-                  >
-                    Name
-                  </th>
-                  <th
-                    style={{
-                      padding: "12px 16px",
-                      fontWeight: 600,
-                      color: "var(--color-ink-muted)",
-                    }}
-                  >
-                    Type
-                  </th>
-                  <th
-                    style={{
-                      padding: "12px 16px",
-                      fontWeight: 600,
-                      color: "var(--color-ink-muted)",
-                    }}
-                  >
-                    Sections
-                  </th>
-                  <th
-                    style={{
-                      padding: "12px 16px",
-                      fontWeight: 600,
-                      color: "var(--color-ink-muted)",
-                    }}
-                  >
-                    Active
-                  </th>
-                  <th style={{ padding: "12px 16px", width: 240 }} />
-                </tr>
-              </thead>
-              <tbody>
-                {templates.map((t) => (
-                  <tr key={t.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "12px 16px", fontWeight: 500 }}>{t.name}</td>
-                    <td style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
-                      {t.kind}
-                    </td>
-                    <td style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
-                      {t.sections.length}
-                    </td>
-                    <td style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
-                      {t.isActive ? "Yes" : "No"}
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Link
-                          href={`/admin/report-templates/${t.id}`}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[var(--color-terracotta)] hover:bg-[var(--color-terracotta-soft)]"
-                          onClick={() => router.prefetch(`/admin/report-templates/${t.id}`)}
-                        >
-                          <Pencil size={14} strokeWidth={1.6} />
-                          Edit
-                        </Link>
-                        <button
-                          type="button"
-                          className="tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-[var(--color-ink-secondary)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
-                          disabled={duplicatingId === t.id}
-                          onClick={() => void duplicateTemplate(t.id)}
-                        >
-                          <Copy size={14} strokeWidth={1.6} aria-hidden />
-                          {duplicatingId === t.id ? "Duplicating…" : "Duplicate"}
-                        </button>
-                        <button
-                          type="button"
-                          className="tap inline-flex items-center justify-center rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--status-error)] disabled:opacity-50"
-                          aria-label={`Delete template ${t.name}`}
-                          title="Delete template"
-                          disabled={deleteBusy || duplicatingId === t.id}
-                          onClick={() => setPendingDelete(t)}
-                        >
-                          <Trash2 size={16} strokeWidth={1.75} aria-hidden />
-                        </button>
-                      </div>
-                    </td>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--color-border)", textAlign: "left" }}>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontWeight: 600,
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      Name
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontWeight: 600,
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      Type
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontWeight: 600,
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      Sections
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 16px",
+                        fontWeight: 600,
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      Active
+                    </th>
+                    <th style={{ padding: "12px 16px", width: 240 }} />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {templates.map((t) => (
+                    <tr key={t.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                      <td style={{ padding: "12px 16px", fontWeight: 500 }}>
+                        {t.name}
+                        {t.defaultFor ? (
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: "var(--color-terracotta)",
+                              marginTop: 4,
+                            }}
+                          >
+                            Default ·{" "}
+                            {
+                              {
+                                all: "All classrooms",
+                                elementary: "Elementary",
+                                childrens_house: "Children’s House",
+                                toddler_house: "Toddler’s House",
+                              }[t.defaultFor]
+                            }
+                          </span>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
+                        {t.kind === "Major" ? "End-of-term" : t.kind}
+                      </td>
+                      <td style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
+                        {t.sections.length}
+                      </td>
+                      <td style={{ padding: "12px 16px", color: "var(--color-ink-secondary)" }}>
+                        {t.isActive ? "Yes" : "No"}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Link
+                            href={`/admin/report-templates/${t.id}`}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[var(--color-terracotta)] hover:bg-[var(--color-terracotta-soft)]"
+                            onClick={() => router.prefetch(`/admin/report-templates/${t.id}`)}
+                          >
+                            <Pencil size={14} strokeWidth={1.6} />
+                            Edit
+                          </Link>
+                          <button
+                            type="button"
+                            className="tap inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-[var(--color-ink-secondary)] hover:bg-[var(--color-muted)] hover:text-[var(--color-ink)] disabled:opacity-50"
+                            disabled={duplicatingId === t.id}
+                            onClick={() => void duplicateTemplate(t.id)}
+                          >
+                            <Copy size={14} strokeWidth={1.6} aria-hidden />
+                            {duplicatingId === t.id ? "Duplicating…" : "Duplicate"}
+                          </button>
+                          <button
+                            type="button"
+                            className="tap inline-flex items-center justify-center rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-muted)] hover:text-[var(--status-error)] disabled:opacity-50"
+                            aria-label={`Delete template ${t.name}`}
+                            title="Delete template"
+                            disabled={deleteBusy || duplicatingId === t.id}
+                            onClick={() => setPendingDelete(t)}
+                          >
+                            <Trash2 size={16} strokeWidth={1.75} aria-hidden />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

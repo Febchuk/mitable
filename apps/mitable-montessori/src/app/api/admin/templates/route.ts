@@ -5,7 +5,11 @@ import { createClient } from "@/utils/supabase/server";
 import { requireUser } from "@/lib/api/auth";
 import { auditLog } from "@/lib/audit/log";
 import { toAdminTemplateDto } from "@/lib/report-templates/admin-dto";
-import { rowsToDb, TemplateSectionsSchema } from "@/lib/report-templates/sections";
+import {
+  DefaultClassroomGroupSchema,
+  rowsToDb,
+  TemplateSectionsSchema,
+} from "@/lib/report-templates/sections";
 
 const REPORTING_PERIOD_ENUM = z
   .enum(["daily", "weekly", "biweekly", "monthly", "quarterly", "end_of_term"])
@@ -13,6 +17,7 @@ const REPORTING_PERIOD_ENUM = z
   .optional();
 
 const CreateTemplateSchema = z.object({
+  defaultFor: DefaultClassroomGroupSchema.optional(),
   name: z.string().min(1).max(120),
   description: z.string().max(400).nullable().optional(),
   kind: z.enum(["Daily", "Major", "Incident"]),
@@ -34,8 +39,9 @@ export async function GET() {
   const { data, error } = await supabase
     .from("report_templates")
     .select(
-      "id, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, reporting_period, context_mode_default, created_at, updated_at"
+      "id, default_for, name, description, kind, sections, section_guidance, section_meta, writing_style, logo_url, icon_tone, is_active, reporting_period, context_mode_default, created_at, updated_at"
     )
+    .order("default_for", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -70,6 +76,7 @@ export async function POST(req: Request) {
     .from("report_templates")
     .insert({
       school_id: auth.user.schoolId,
+      default_for: input.defaultFor ?? null,
       name: input.name,
       description: input.description ?? null,
       kind: input.kind,
@@ -87,7 +94,13 @@ export async function POST(req: Request) {
 
   if (error || !data) {
     return NextResponse.json(
-      { error: "Failed to create template", details: error?.message },
+      {
+        error:
+          error?.code === "23505"
+            ? "A default already exists for these classrooms. Edit that template or remove its default assignment first."
+            : "Failed to create template",
+        details: error?.message,
+      },
       { status: 500 }
     );
   }

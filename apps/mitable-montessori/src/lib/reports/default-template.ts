@@ -1,3 +1,4 @@
+import { activeCurriculumTree } from "@/lib/curriculum/active-tree";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReportTemplate, ReportKind } from "@/components/montessori/new-report/mock-data";
 import type { SectionMeta, SectionMetaEntry } from "@/lib/report-templates/sections";
@@ -230,12 +231,12 @@ async function loadClassroomSubjects(
   const { data, error } = await supabase
     .from("curriculum_subjects")
     .select(
-      "id, name, sort_order, curriculum_topics(id, name, sort_order, curriculum_subtopics(id, name, sort_order))"
+      "id, name, sort_order, is_active, curriculum_topics(id, name, sort_order, is_active, curriculum_subtopics(id, name, sort_order, is_active))"
     )
     .eq("curriculum_id", curriculumId);
   if (error) throw new Error(error.message);
 
-  return [...(data ?? [])]
+  return [...activeCurriculumTree((data ?? []) as unknown as SubjectDbRow[])]
     .sort((a, b) => ((a.sort_order as number) ?? 0) - ((b.sort_order as number) ?? 0))
     .map((subj) => ({
       id: subj.id as string,

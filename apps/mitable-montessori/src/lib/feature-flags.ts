@@ -4,7 +4,21 @@
  */
 
 function readPublicFlag(name: string): boolean {
-  const raw = process.env[name];
+  // Next.js only includes public flags in the browser when each env access is literal.
+  // Dynamic process.env[name] produced different server/client navigation.
+  const flags: Record<string, string | undefined> = {
+    NEXT_PUBLIC_ADD_TODAY_PROGRESS_AND_AGENT: process.env.NEXT_PUBLIC_ADD_TODAY_PROGRESS_AND_AGENT,
+    NEXT_PUBLIC_ADMIN_EXTERNAL_API: process.env.NEXT_PUBLIC_ADMIN_EXTERNAL_API,
+    NEXT_PUBLIC_ADMIN_TODAY: process.env.NEXT_PUBLIC_ADMIN_TODAY,
+    NEXT_PUBLIC_CLASSROOM_GROUPS: process.env.NEXT_PUBLIC_CLASSROOM_GROUPS,
+    NEXT_PUBLIC_CLASSROOM_PROGRAMS: process.env.NEXT_PUBLIC_CLASSROOM_PROGRAMS,
+    NEXT_PUBLIC_ENABLE_CAPTURE_WORKER: process.env.NEXT_PUBLIC_ENABLE_CAPTURE_WORKER,
+    NEXT_PUBLIC_ENABLE_LOCAL_INTENT: process.env.NEXT_PUBLIC_ENABLE_LOCAL_INTENT,
+    NEXT_PUBLIC_REPORT_AI_SCORING: process.env.NEXT_PUBLIC_REPORT_AI_SCORING,
+    NEXT_PUBLIC_REPORT_FIRST_EXPERIENCE: process.env.NEXT_PUBLIC_REPORT_FIRST_EXPERIENCE,
+    NEXT_PUBLIC_TEACHER_CHAT_AGENT: process.env.NEXT_PUBLIC_TEACHER_CHAT_AGENT,
+  };
+  const raw = flags[name];
   return raw === "1" || raw === "true";
 }
 
@@ -84,11 +98,11 @@ export function classroomProgramsEnabled(): boolean {
 }
 
 /**
- * When true, admins see Report templates in nav and can edit school templates.
- * Off by default — teachers use the built-in Daily / End-of-term / Incident flow.
+ * Admins manage school report layouts and grading scales in the product.
+ * Teachers keep the existing report flow and receive classroom defaults automatically.
  */
 export function adminReportTemplatesEnabled(): boolean {
-  return readPublicFlag("NEXT_PUBLIC_ADMIN_REPORT_TEMPLATES");
+  return true;
 }
 
 /**

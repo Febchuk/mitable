@@ -1,12 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/middleware";
+import { getAppUrl } from "@/lib/utils/app-url";
 
 const PUBLIC_PATHS = [
   "/",
   "/login",
   "/signup",
+  "/forgot-password",
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/fonts",
+  "/offline",
   "/auth/callback",
   "/parents/claim",
+  "/teachers/claim",
   "/parents/login",
   "/api/health",
   "/api/v1/auth",
@@ -47,10 +54,15 @@ export async function middleware(request: NextRequest) {
     return response;
   };
 
-  if (!user && !isPublic(pathname)) {
-    const url = request.nextUrl.clone();
+  // API handlers authenticate their own cookie, bearer-token or integration-key requests.
+  // Keep their JSON errors intact rather than turning them into HTML login redirects.
+  if (!user && !pathname.startsWith("/api/") && !isPublic(pathname)) {
+    // Railway can expose the container host here. Keep parent email links on
+    // the configured public app, never localhost:8080.
+    const url = new URL(getAppUrl(request));
     const requestedDestination = `${pathname}${request.nextUrl.search}`;
-    url.pathname = pathname.startsWith("/parents/") ? "/parents/login" : "/login";
+    url.pathname =
+      pathname === "/parents" || pathname.startsWith("/parents/") ? "/parents/login" : "/login";
     url.search = "";
     url.searchParams.set("redirect", requestedDestination);
     return withSessionCookies(NextResponse.redirect(url));

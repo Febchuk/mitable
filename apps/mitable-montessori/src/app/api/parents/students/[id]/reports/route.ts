@@ -1,3 +1,4 @@
+import { listPublishedReports } from "@/lib/parents/published-reports";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { requireGuardian } from "@/lib/api/guardian-auth";
@@ -16,15 +17,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data, error } = await supabase
-    .from("reports")
-    .select("id, report_type, period_start, period_end, title, body, sent_at")
-    .eq("student_id", id)
-    .eq("status", "sent")
-    .order("sent_at", { ascending: false })
-    .limit(50);
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    return NextResponse.json({ reports: await listPublishedReports(supabase, id) });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not load reports" },
+      { status: 500 }
+    );
   }
-  return NextResponse.json({ reports: data ?? [] });
 }

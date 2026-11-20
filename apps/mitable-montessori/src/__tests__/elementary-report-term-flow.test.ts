@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   agent: vi.fn(),
   role: "teacher" as "teacher" | "admin",
   classroomAllowed: true,
+  classroomCode: "Lower Elementary",
 }));
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => mocks.db }));
 vi.mock("@/lib/api/auth", () => ({
@@ -32,7 +33,7 @@ vi.mock("@/lib/app/active-classroom", async (original) => ({
   }),
   getActiveClassroomForCurrentUser: async () => ({ id: ROOM }),
   listTeacherClassroomsForCurrentUser: async () => [
-    { id: ROOM, name: "Elementary", code: "Lower Elementary" },
+    { id: ROOM, name: "Elementary", code: mocks.classroomCode },
   ],
 }));
 vi.mock("@/lib/audit/log", () => ({ auditLog: vi.fn() }));
@@ -60,6 +61,7 @@ beforeEach(() => {
   mocks.schoolId = "school";
   mocks.role = "teacher";
   mocks.classroomAllowed = true;
+  mocks.classroomCode = "Lower Elementary";
   mocks.agent.mockReset();
   fixture = toddlerReportFixture();
   fixture.tables.classrooms[0].code = "Lower Elementary";
@@ -81,6 +83,9 @@ beforeEach(() => {
     },
   ];
   fixture.tables.elementary_exam_grades = [];
+  fixture.tables.elementary_grading_scales = [
+    { school_id: "school", a_min: 80, b_min: 60, c_min: 40 },
+  ];
   fixture.tables.elementary_term_grade_comments = [];
   mocks.db = fixture.db;
 });
@@ -286,7 +291,7 @@ it("compiles shared term reports on creation and regeneration without sending th
     id: "shared-source",
     student_id: CHILD,
     students: { school_id: "school" },
-    report_type: "sen",
+    report_type: "incident",
     status: "sent",
     report_date: "2027-02-01",
     sections: null,
@@ -295,7 +300,7 @@ it("compiles shared term reports on creation and regeneration without sending th
   const report = await createReport(FUTURE);
   const highlights = () =>
     (report.sections as Array<{ heading: string; paragraphs: Array<{ html: string }> }>).find(
-      (section) => section.heading === "SEN reports — term highlights"
+      (section) => section.heading === "Incident reports — term highlights"
     )!;
   expect(fieldPayloadToReadableText(highlights().paragraphs[0].html)).toContain(
     "Communication improved with support."
@@ -460,7 +465,8 @@ it("computes the subject total from components and snapshots the overall letter 
       overallGradeLabel: "A",
     })
   );
-  expect(summary((await getReport(String(report.id)))!)?.overallGradeLabel).toBe("A");
+  expect(summary((await getReport(String(report.id)))!)?.overallGradeLabel).toBe("B");
+  fixture.tables.elementary_grading_scales[0].a_min = 65;
   await sendReport(
     { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
     [],
@@ -530,23 +536,18 @@ it("accepts zero scores and total-only results without inventing components or r
   expect(summary(await createReport(FUTURE))?.averagePercentage).toBe(40);
 });
 
-it("saves an overall grade without a comment and preserves it when an older client updates the comment", async () => {
+it("ignores manual letters from old clients and saves or clears only the comment", async () => {
   const context = { classroomId: ROOM, studentId: CHILD, termId: FUTURE };
   expect(
     (await saveComment(req({ ...context, comment: null, overallGradeLabel: "B" }))).status
   ).toBe(200);
-  expect(fixture.tables.elementary_term_grade_comments[0]).toMatchObject({
-    comment: "",
-    overall_grade_label: "B",
-  });
-  await saveComment(req({ ...context, comment: "New comment." }));
+  expect(fixture.tables.elementary_term_grade_comments).toHaveLength(0);
+  await saveComment(req({ ...context, comment: "New comment.", overallGradeLabel: "A" }));
   expect(fixture.tables.elementary_term_grade_comments[0]).toMatchObject({
     comment: "New comment.",
-    overall_grade_label: "B",
+    overall_grade_label: null,
   });
   await saveComment(req({ ...context, comment: null }));
-  expect(fixture.tables.elementary_term_grade_comments[0].overall_grade_label).toBe("B");
-  await saveComment(req({ ...context, comment: null, overallGradeLabel: null }));
   expect(fixture.tables.elementary_term_grade_comments).toHaveLength(0);
 });
 
@@ -850,3 +851,111 @@ it.each(["save", "regenerate", "send-during-regeneration"])(
     ).toBe("Concurrent director review.");
   }
 );
+
+it.each([
+  ["Toddler", "toddler_house"],
+  ["Casa", "childrens_house"],
+  ["Lower Elementary", "elementary"],
+])("uses the configured %s end-of-term layout including skills", async (code, group) => {
+  mocks.classroomCode = code;
+  fixture.tables.classrooms[0].code = code;
+  fixture.tables.report_templates = [
+    {
+      id: "school-layout",
+      school_id: "school",
+      kind: "Major",
+      is_active: true,
+      default_for: group,
+      sections: ["School note", "Skills report", "Teacher's comment"],
+      section_meta: {
+        "School note": { type: "hardcoded" },
+        "Skills report": { type: "term_skills" },
+        "Teacher's comment": { type: "manual_text" },
+      },
+      section_guidance: { "School note": "Our own school layout." },
+    },
+  ];
+  const report = await createReport(FUTURE);
+  expect(report.template_id).toBe("school-layout");
+  expect((report.sections as StoredSections).map((section) => section.heading)).toEqual([
+    "School note",
+    "Skills report",
+    "Teacher's comment",
+  ]);
+  expect(
+    termSkillsForDisplay((report.sections as StoredSections)[1].paragraphs[0].html)[0].rows[0].value
+  ).toBeNull();
+  const response = await regenerate(req({}), {
+    params: Promise.resolve({ id: String(report.id) }),
+  });
+  expect(response.status).toBe(200);
+  expect((report.sections as StoredSections).map((section) => section.heading)).toEqual([
+    "School note",
+    "Skills report",
+    "Teacher's comment",
+  ]);
+  await sendReport(
+    { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+    [],
+    {}
+  );
+  expect((report.sections as StoredSections).map((section) => section.heading)).toEqual([
+    "School note",
+    "Skills report",
+    "Teacher's comment",
+  ]);
+});
+it("preserves a configured field order and omitted blocks across reopening, drafting and sending", async () => {
+  await saveResults();
+  fixture.tables.report_templates = [
+    {
+      id: "school-layout",
+      school_id: "school",
+      kind: "Major",
+      is_active: true,
+      default_for: "elementary",
+      sections: ["Director's comment", "Results", "School message"],
+      section_meta: {
+        "Director's comment": { type: "director_comment" },
+        Results: { type: "exam_grades", termId: null },
+        "School message": { type: "manual_text" },
+      },
+      section_guidance: {},
+    },
+  ];
+  const report = await createReport(FUTURE);
+  const headings = ["Director's comment", "Results", "School message"];
+  expect((report.sections as StoredSections).map((section) => section.heading)).toEqual(headings);
+  expect(
+    decodeExamGrades((report.sections as StoredSections)[1].paragraphs[0].html)?.overallGradeLabel
+  ).toBe("A");
+  (report.sections as StoredSections)[2].paragraphs[0].html = "Teacher's saved message.";
+  expect((await getReport(String(report.id)))?.sections?.map((section) => section.heading)).toEqual(
+    headings
+  );
+  const response = await regenerate(req({}), {
+    params: Promise.resolve({ id: String(report.id) }),
+  });
+  expect(response.status).toBe(200);
+  expect((report.sections as StoredSections).map((section) => section.heading)).toEqual(headings);
+  expect((report.sections as StoredSections)[2].paragraphs[0].html).toBe(
+    "Teacher's saved message."
+  );
+  await sendReport(
+    { supabase: fixture.db, reportId: String(report.id), actorUserId: "teacher" },
+    [],
+    {}
+  );
+  expect(
+    buildReportPdfBlocks(
+      report.sections as StoredSections,
+      report.section_meta as Parameters<typeof buildReportPdfBlocks>[1]
+    ).map((block) => block.heading)
+  ).toEqual(headings);
+});
+it("keeps the numeric mean but leaves the letter unset when the school has no scale", async () => {
+  await saveResults();
+  fixture.tables.elementary_grading_scales = [];
+  const report = await createReport(FUTURE);
+  expect(summary(report)).toMatchObject({ averagePercentage: 90, overallGradeLabel: null });
+});

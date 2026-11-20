@@ -89,6 +89,8 @@ it("defaults the Grades screen to the current term even when a future term is li
         students: [{ id: "child", classroomId: "room", name: "Ada Test" }],
         grades: [],
         termComments: [],
+        subjects: [{ classroomId: "room", name: "Mathematics" }],
+        gradingScale: null,
       }}
     />
   );

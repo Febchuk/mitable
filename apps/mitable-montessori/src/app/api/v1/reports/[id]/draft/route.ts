@@ -1,9 +1,12 @@
 import { elementaryGradeSnapshot } from "@/lib/reports/elementary-grade-snapshot";
-import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
+import {
+  buildTermHistorySections,
+  mergeTermHistory,
+  refreshConfiguredTermHistory,
+} from "@/lib/reports/term-history";
 import { termSkillsSection } from "@/lib/reports/term-skills";
 import { withDirectorComment } from "@/lib/reports/director-comment";
 import { withTermFeedback } from "@/lib/reports/term-feedback";
-import { isElementaryClassroomCode } from "@/lib/app/active-classroom";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { requireUser, requireTeacherForClassroom } from "@/lib/api/auth";
@@ -97,7 +100,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   // Fetch classroom name so [CLASSROOM_n] also de-tokenizes properly.
   let classroomDisplay = "";
-  let elementary = false;
   {
     const { data: classroom } = await supabase
       .from("classrooms")
@@ -105,7 +107,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .eq("id", report.classroom_id as string)
       .maybeSingle();
     classroomDisplay = (classroom as { name: string | null } | null)?.name?.trim() ?? "";
-    elementary = isElementaryClassroomCode(classroom?.code);
   }
   if (report.status !== "draft") {
     return NextResponse.json(
@@ -127,7 +128,20 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   let templateSections: { heading: string; guidance: string }[] = [];
   let writingStyle = "";
   let templateSectionMeta: SectionMeta = {};
-  if (report.report_type === "major") {
+  if (report.report_type === "major" && report.template_id) {
+    report.sections = await refreshConfiguredTermHistory(
+      supabase,
+      {
+        schoolId: auth.user.schoolId,
+        studentId: report.student_id,
+        periodStart: report.period_start || report.report_date,
+        periodEnd: report.period_end || report.report_date,
+      },
+      report.sections ?? [],
+      report.section_meta ?? {}
+    );
+  }
+  if (report.report_type === "major" && !report.template_id) {
     const built = await buildTermHistorySections(supabase, {
       schoolId: auth.user.schoolId,
       studentId: report.student_id,
@@ -141,7 +155,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     report.sections = merged.sections;
     report.section_meta = merged.sectionMeta;
     if (
-      elementary &&
       !report.sections.some(
         (section: { heading: string }) =>
           report.section_meta[section.heading]?.type === "term_skills"
@@ -183,12 +196,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         ...((tpl.section_meta as SectionMeta | null) ?? {}),
         ...storedSectionMeta,
       };
-      templateHeadings = [
-        ...headings,
-        ...storedSections
-          .map((section) => section.heading)
-          .filter((heading) => !headings.includes(heading)),
-      ];
+      templateHeadings = storedSections.length
+        ? storedSections.map((section) => section.heading)
+        : headings;
       sectionGuidance = { ...guidance, ...storedSectionGuidance };
       templateSections = templateHeadings
         .filter((heading) => !sectionExcludedFromAgent(templateSectionMeta[heading]))
@@ -297,7 +307,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   };
   let seededSections: StoredSection[] = (report.sections as StoredSection[] | null) ?? [];
   const isDefaultTemplateReport =
-    !report.template_id && Object.keys(storedSectionMeta).length > 0 && seededSections.length > 0;
+    Object.values(storedSectionMeta).some((meta) => meta.type === "progress_topic") &&
+    seededSections.length > 0;
 
   if (isDefaultTemplateReport) {
     seededSections = await refreshDefaultTemplateProgressSections(supabase, {

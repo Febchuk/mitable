@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { averageScore, overallLetterGrade } from "@/lib/grades/grading-scale";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { FilterSelect, PageHeader, cardStyle } from "@/components/montessori/page-header";
 import { ToastBus } from "@/components/montessori/primitives";
@@ -57,7 +58,16 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
   const [saving, setSaving] = React.useState(false);
   const [termComment, setTermComment] = React.useState("");
   const [savingTermComment, setSavingTermComment] = React.useState(false);
-  const [overallGradeLabel, setOverallGradeLabel] = React.useState("");
+  const subjectOptions = [
+    ...new Set(
+      initialData.subjects
+        .filter((subject) => subject.classroomId === classroomId)
+        .map((subject) => subject.name)
+    ),
+  ];
+  // Preserve an existing subject if the curriculum has since been renamed or removed.
+  if (form.id && form.subject && !subjectOptions.includes(form.subject))
+    subjectOptions.push(form.subject);
 
   React.useEffect(() => {
     const firstStudent = initialData.students.find((s) => s.classroomId === classroomId);
@@ -71,6 +81,8 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
       grade.termId === termId &&
       grade.studentId === selectedStudentId
   );
+  const cumulativeAverage = averageScore(visibleGrades);
+  const overallGradeLabel = overallLetterGrade(cumulativeAverage, initialData.gradingScale);
   const selectedStudent = classroomStudents.find((student) => student.id === selectedStudentId);
   const selectedTermComment = termComments.find(
     (item) =>
@@ -81,7 +93,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
 
   React.useEffect(() => {
     setTermComment(selectedTermComment?.comment ?? "");
-    setOverallGradeLabel(selectedTermComment?.overallGradeLabel ?? "");
   }, [
     classroomId,
     termId,
@@ -195,7 +206,6 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
           studentId: selectedStudentId,
           termId,
           comment: termComment.trim() || null,
-          overallGradeLabel: overallGradeLabel || null,
         }),
       });
       const payload = (await response.json()) as {
@@ -244,7 +254,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
       <PageHeader
         overline="Elementary"
         title="Grades"
-        subtitle="Enter CA, class participation and AFL for each subject. Choose one overall grade and add the term comment."
+        subtitle="Enter CA, class participation and AFL for each subject. The overall average and grade update automatically from saved results."
       />
       <div style={{ padding: 24, maxWidth: 1120, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
@@ -289,14 +299,32 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                 {form.id ? "Edit grade" : "Add grade"}
               </h2>
               <Field label="Subject">
-                <input
+                <select
                   style={inputStyle}
                   value={form.subject}
                   onChange={(e) => update("subject", e.target.value)}
-                  placeholder="Mathematics"
-                  maxLength={120}
                   required
-                />
+                  disabled={!subjectOptions.length}
+                >
+                  <option value="">Select a subject</option>
+                  {subjectOptions.map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject}
+                    </option>
+                  ))}
+                </select>
+                {!subjectOptions.length ? (
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: 6,
+                      fontSize: 13,
+                      color: "var(--color-ink-secondary)",
+                    }}
+                  >
+                    Ask an admin to add subjects to this classroom’s curriculum.
+                  </span>
+                ) : null}
               </Field>
               <Field label="Assessment">
                 <input
@@ -376,7 +404,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="submit"
-                  disabled={saving || !classroomStudents.length}
+                  disabled={saving || !classroomStudents.length || !subjectOptions.length}
                   style={{
                     border: 0,
                     borderRadius: 9,
@@ -482,24 +510,30 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
               <p style={{ margin: "0 0 16px", color: "var(--color-ink-secondary)", fontSize: 14 }}>
                 This grade and comment describe the cumulative result across all saved subjects.
               </p>
-              <p className="mb-4 text-sm font-semibold">
-                Cumulative average:{" "}
-                {visibleGrades.length
-                  ? `${Math.round((visibleGrades.reduce((sum, grade) => sum + grade.percentage, 0) / visibleGrades.length) * 100) / 100}%`
-                  : "No saved results yet"}
+              <p className="mb-4 text-sm font-semibold" aria-live="polite">
+                Overall average:{" "}
+                <output aria-label="Overall average">
+                  {cumulativeAverage == null ? "No saved results yet" : `${cumulativeAverage}%`}
+                </output>
               </p>
               <Field label="Overall grade">
-                <select
-                  style={inputStyle}
-                  value={overallGradeLabel}
-                  onChange={(event) => setOverallGradeLabel(event.target.value)}
-                >
-                  <option value="">Not graded yet</option>
-                  <option value="A">A — Excellent</option>
-                  <option value="B">B — Good</option>
-                  <option value="C">C — Satisfactory</option>
-                  <option value="D">D — Encouraged to Improve</option>
-                </select>
+                <output style={{ ...inputStyle, display: "block" }} aria-live="polite">
+                  {cumulativeAverage == null
+                    ? "No saved results yet"
+                    : (overallGradeLabel ?? "School grading scale not set")}
+                </output>
+                {!initialData.gradingScale ? (
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: 6,
+                      fontSize: 13,
+                      color: "var(--color-ink-secondary)",
+                    }}
+                  >
+                    An admin can set the A–D score ranges in Report templates.
+                  </span>
+                ) : null}
               </Field>
               <Field label="Comments">
                 <textarea
@@ -523,7 +557,7 @@ export default function GradesClient({ initialData }: { initialData: ElementaryG
                   cursor: "pointer",
                 }}
               >
-                {savingTermComment ? "Saving…" : "Save overall grade and comment"}
+                {savingTermComment ? "Saving…" : "Save comment"}
               </button>
             </form>
           </div>

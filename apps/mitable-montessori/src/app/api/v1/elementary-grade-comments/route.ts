@@ -94,20 +94,8 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   const comment = input.comment?.trim() || null;
-  let overallGradeLabel = input.overallGradeLabel;
-  if (overallGradeLabel === undefined) {
-    const { data: previous, error } = await admin
-      .from("elementary_term_grade_comments")
-      .select("overall_grade_label")
-      .eq("school_id", auth.user.schoolId)
-      .eq("classroom_id", input.classroomId)
-      .eq("student_id", input.studentId)
-      .eq("term_id", input.termId)
-      .maybeSingle();
-    if (error)
-      return NextResponse.json({ error: "Could not load existing term feedback" }, { status: 500 });
-    overallGradeLabel = (previous?.overall_grade_label as "A" | "B" | "C" | "D" | null) ?? null;
-  }
+  // Letters are derived from saved results and the school scale, never teacher input.
+  const overallGradeLabel = null;
 
   if (!comment && !overallGradeLabel) {
     const { error } = await admin

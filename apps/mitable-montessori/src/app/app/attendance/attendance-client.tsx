@@ -27,7 +27,6 @@ import {
   type BulkScope,
 } from "./bulk-attendance-panel";
 import styles from "./attendance.module.css";
-import { AttendanceSendPanel } from "./attendance-send-panel";
 
 const TONES: Tone[] = ["clay", "sage", "butter", "blue", "terracotta"];
 
@@ -176,7 +175,6 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
   const [bulkApplying, setBulkApplying] = React.useState(false);
   const inflight = React.useRef(0);
   const failedRows = React.useRef(new Set<string>());
-  const [sendBusy, setSendBusy] = React.useState(false);
 
   const unmarkedCount = React.useMemo(
     () =>
@@ -398,7 +396,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
             <BulkAttendanceToolbar
               totalStudents={data.students.length}
               unmarkedCount={unmarkedCount}
-              applying={bulkApplying || sendBusy}
+              applying={bulkApplying}
               bulkOpen={bulkOpen}
               onToggleBulk={() => setBulkOpen((v) => !v)}
               onAllPresent={markAllPresent}
@@ -407,7 +405,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
               open={bulkOpen}
               totalStudents={data.students.length}
               unmarkedCount={unmarkedCount}
-              applying={bulkApplying || sendBusy}
+              applying={bulkApplying}
               onClose={() => setBulkOpen(false)}
               onApply={(params, scope) => void applyBulk(params, scope)}
             />
@@ -421,7 +419,7 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
                     student={student}
                     showClassroom={isAllClasses}
                     row={row}
-                    disabled={bulkApplying || sendBusy}
+                    disabled={bulkApplying}
                     onChange={(next) => {
                       setRows((prev) => ({
                         ...prev,
@@ -434,16 +432,6 @@ function AttendanceDay({ data }: { data: AttendanceDayData }) {
               })}
             </div>
           </>
-        )}
-
-        {data.students.length > 0 && (
-          <AttendanceSendPanel
-            date={data.date}
-            classroomIds={[...new Set(data.students.map((student) => student.classroomId))]}
-            markedCount={data.students.length - unmarkedCount}
-            disabled={bulkApplying || saveStatus === "saving" || saveStatus === "error"}
-            onBusyChange={setSendBusy}
-          />
         )}
 
         <div

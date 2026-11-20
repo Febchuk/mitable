@@ -852,6 +852,7 @@ async function getSubjectInSchool(ctx: AdminContext, subjectId: string) {
     .from("curriculum_subjects")
     .select("id, curriculum_id")
     .eq("id", subjectId)
+    .eq("is_active", true)
     .maybeSingle();
   if (error) throw new AdminError(error.message, "db_error");
   if (!data) throw new AdminError("Subject not found", "not_found");
@@ -864,6 +865,7 @@ async function getTopicInSchool(ctx: AdminContext, topicId: string) {
     .from("curriculum_topics")
     .select("id, curriculum_id, subject_id")
     .eq("id", topicId)
+    .eq("is_active", true)
     .maybeSingle();
   if (error) throw new AdminError(error.message, "db_error");
   if (!data) throw new AdminError("Topic not found", "not_found");
@@ -876,6 +878,7 @@ async function getSubtopicInSchool(ctx: AdminContext, subtopicId: string) {
     .from("curriculum_subtopics")
     .select("id, topic_id")
     .eq("id", subtopicId)
+    .eq("is_active", true)
     .maybeSingle();
   if (error) throw new AdminError(error.message, "db_error");
   if (!data) throw new AdminError("Lesson not found", "not_found");
@@ -1022,7 +1025,8 @@ export async function createCurriculumSubject(
   const { data: subjects, error } = await ctx.supabase
     .from("curriculum_subjects")
     .select("name")
-    .eq("curriculum_id", input.curriculum_id);
+    .eq("curriculum_id", input.curriculum_id)
+    .eq("is_active", true);
   if (error) throw new AdminError(error.message, "db_error");
   const normalized = input.name.trim().replace(/\s+/g, " ").toLowerCase();
   if (
@@ -1051,7 +1055,8 @@ export async function createCurriculumTopic(
   const { data: topics, error } = await ctx.supabase
     .from("curriculum_topics")
     .select("name")
-    .eq("subject_id", input.subject_id);
+    .eq("subject_id", input.subject_id)
+    .eq("is_active", true);
   if (error) throw new AdminError(error.message, "db_error");
   const normalized = input.name.trim().replace(/\s+/g, " ").toLowerCase();
   if (
@@ -1154,7 +1159,8 @@ export async function renameCurriculumSubject(
   const { data: siblings, error: readError } = await ctx.supabase
     .from("curriculum_subjects")
     .select("id, name")
-    .eq("curriculum_id", subject.curriculum_id);
+    .eq("curriculum_id", subject.curriculum_id)
+    .eq("is_active", true);
   if (readError) throw new AdminError(readError.message, "db_error");
   const normalized = name.trim().replace(/\s+/g, " ").toLowerCase();
   if (
@@ -1182,7 +1188,8 @@ export async function reorderCurriculumSubjects(
   const { data: subjects, error: readError } = await ctx.supabase
     .from("curriculum_subjects")
     .select("id")
-    .eq("curriculum_id", curriculumId);
+    .eq("curriculum_id", curriculumId)
+    .eq("is_active", true);
   if (readError) throw new AdminError(readError.message, "db_error");
   assertExactSiblingIds(
     subjectIds,
@@ -1212,7 +1219,8 @@ export async function renameCurriculumTopic(
   const { data: siblings, error: readError } = await ctx.supabase
     .from("curriculum_topics")
     .select("id, name")
-    .eq("subject_id", topic.subject_id);
+    .eq("subject_id", topic.subject_id)
+    .eq("is_active", true);
   if (readError) throw new AdminError(readError.message, "db_error");
   const normalized = name.trim().replace(/\s+/g, " ").toLowerCase();
   if (
@@ -1240,7 +1248,8 @@ export async function reorderCurriculumTopics(
   const { data: topics, error: readError } = await ctx.supabase
     .from("curriculum_topics")
     .select("id")
-    .eq("subject_id", subjectId);
+    .eq("subject_id", subjectId)
+    .eq("is_active", true);
   if (readError) throw new AdminError(readError.message, "db_error");
   assertExactSiblingIds(
     topicIds,
@@ -1283,7 +1292,8 @@ export async function reorderCurriculumSubtopics(
   const { data: subtopics, error: readError } = await ctx.supabase
     .from("curriculum_subtopics")
     .select("id")
-    .eq("topic_id", topicId);
+    .eq("topic_id", topicId)
+    .eq("is_active", true);
   if (readError) throw new AdminError(readError.message, "db_error");
   assertExactSiblingIds(
     subtopicIds,
@@ -1375,4 +1385,28 @@ export async function deleteSchoolTerm(ctx: AdminContext, termId: string): Promi
     .eq("id", termId)
     .eq("school_id", ctx.schoolId);
   if (error) throw new AdminError(error.message, "db_error");
+}
+
+/** Archive rather than erase lessons referenced by student progress and sent reports. */
+export async function removeCurriculumSubject(ctx: AdminContext, id: string): Promise<void> {
+  await getSubjectInSchool(ctx, id);
+  await archiveCurriculumRow(ctx, "curriculum_subjects", id);
+}
+export async function removeCurriculumTopic(ctx: AdminContext, id: string): Promise<void> {
+  await getTopicInSchool(ctx, id);
+  await archiveCurriculumRow(ctx, "curriculum_topics", id);
+}
+export async function removeCurriculumSubtopic(ctx: AdminContext, id: string): Promise<void> {
+  await getSubtopicInSchool(ctx, id);
+  await archiveCurriculumRow(ctx, "curriculum_subtopics", id);
+}
+async function archiveCurriculumRow(ctx: AdminContext, table: string, id: string) {
+  const { data, error } = await ctx.supabase
+    .from(table)
+    .update({ is_active: false })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new AdminError(error.message, "db_error");
+  if (!data) throw new AdminError("Could not remove this item. Refresh and try again.", "conflict");
 }
