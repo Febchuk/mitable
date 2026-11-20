@@ -1,3 +1,4 @@
+import { activeCurriculumTree } from "@/lib/curriculum/active-tree";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeMarkingSchema, type MarkingSchema } from "@/lib/progress/marking-schemas";
 
@@ -146,14 +147,14 @@ export async function getCurriculumTree(
   const { data: subjectRows, error: treeErr } = await supabase
     .from("curriculum_subjects")
     .select(
-      "id, name, sort_order, curriculum_topics(id, name, sort_order, marking_schema, curriculum_subtopics(id, name, sort_order))"
+      "id, name, sort_order, is_active, curriculum_topics(id, name, sort_order, is_active, marking_schema, curriculum_subtopics(id, name, sort_order, is_active))"
     )
     .eq("curriculum_id", args.curriculumId)
     .returns<SubjectDbRow[]>();
 
   if (treeErr) throw new Error(treeErr.message);
 
-  const subjects: CurriculumTreeSubject[] = (subjectRows ?? [])
+  const subjects: CurriculumTreeSubject[] = activeCurriculumTree(subjectRows ?? [])
     .map((subj) => ({
       id: subj.id,
       name: subj.name,

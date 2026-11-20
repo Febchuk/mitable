@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { passwordResetAudience, passwordResetCallbackUrl } from "@/lib/auth/password-reset";
 import { createClient } from "@/utils/supabase/client";
+import { safeParentRedirect } from "@/lib/parents/redirect";
 
 export default function ForgotPasswordPage() {
   return (
@@ -21,7 +22,11 @@ export default function ForgotPasswordPage() {
 function ForgotPasswordInner() {
   const params = useSearchParams();
   const audience = passwordResetAudience(params.get("audience"));
-  const loginHref = audience === "parent" ? "/parents/login" : "/login";
+  const destination = audience === "parent" ? safeParentRedirect(params.get("redirect")) : null;
+  const loginHref =
+    audience === "parent"
+      ? `/parents/login${destination ? `?redirect=${encodeURIComponent(destination)}` : ""}`
+      : "/login";
   const [email, setEmail] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [sent, setSent] = React.useState(false);
@@ -32,7 +37,11 @@ function ForgotPasswordInner() {
     setBusy(true);
     setError(null);
     const { error: resetError } = await createClient().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: passwordResetCallbackUrl(window.location.origin, audience),
+      redirectTo: passwordResetCallbackUrl(
+        window.location.origin,
+        audience,
+        params.get("redirect")
+      ),
     });
     setBusy(false);
     if (resetError) {
@@ -56,6 +65,12 @@ function ForgotPasswordInner() {
               Enter your sign-in email and we&apos;ll send you a secure reset link.
             </p>
           </header>
+
+          {audience === "parent" && params.get("error") === "recovery_expired" ? (
+            <p role="alert" className="text-sm text-ink-secondary">
+              That reset link could not be verified. Enter your email below to request a new one.
+            </p>
+          ) : null}
 
           {sent ? (
             <div className="rounded-xl border border-sage/30 bg-sage/10 px-4 py-4 text-sm text-ink">

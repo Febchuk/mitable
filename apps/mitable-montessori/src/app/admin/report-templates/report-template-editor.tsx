@@ -9,8 +9,11 @@ import type {
   ReportingPeriod,
   ContextModeDefault,
 } from "@/lib/report-templates/admin-dto";
-import { REPORTING_PERIOD_LABEL, REPORTING_PERIOD_VALUES } from "@/lib/report-templates/admin-dto";
-import type { TemplateSectionRow } from "@/lib/report-templates/sections";
+import {
+  TemplateSectionsSchema,
+  type DefaultClassroomGroup,
+  type TemplateSectionRow,
+} from "@/lib/report-templates/sections";
 import { PageHeader, cardHeaderStyle, cardStyle } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,9 +57,10 @@ export function ReportTemplateEditor({
   const router = useRouter();
   const [loading, setLoading] = React.useState(mode === "edit");
   const [saving, setSaving] = React.useState(false);
+  const [defaultFor, setDefaultFor] = React.useState<DefaultClassroomGroup | null>(null);
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [kind, setKind] = React.useState<(typeof KINDS)[number]>("Daily");
+  const [kind, setKind] = React.useState<(typeof KINDS)[number]>("Major");
   const [iconTone, setIconTone] = React.useState<(typeof ICON_TONES)[number]>("clay");
   const [writingStyle, setWritingStyle] = React.useState("");
   const [reportingPeriod, setReportingPeriod] = React.useState<ReportingPeriod | null>(null);
@@ -65,6 +69,7 @@ export function ReportTemplateEditor({
     bundlesFromRows([emptySection()])
   );
   const [dragState, setDragState] = React.useState<{ from: number; over: number } | null>(null);
+  const [logoBusy, setLogoBusy] = React.useState(false);
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const [duplicating, setDuplicating] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -90,6 +95,7 @@ export function ReportTemplateEditor({
         if (cancelled) return;
         const t = data.template;
         setName(t.name);
+        setDefaultFor(t.defaultFor);
         setDescription(t.description ?? "");
         setKind(t.kind as (typeof KINDS)[number]);
         setIconTone(t.iconTone as (typeof ICON_TONES)[number]);
@@ -161,10 +167,16 @@ export function ReportTemplateEditor({
       ToastBus.push({ message: "Curriculum sections need a program selected." });
       return false;
     }
+    const parsed = TemplateSectionsSchema.safeParse(filled);
+    if (!parsed.success) {
+      ToastBus.push({ message: parsed.error.issues[0].message });
+      return false;
+    }
     return true;
   };
 
   const buildPayload = () => ({
+    defaultFor: kind === "Major" ? defaultFor : null,
     name: name.trim(),
     description: description.trim() || null,
     kind,
@@ -223,47 +235,65 @@ export function ReportTemplateEditor({
       }
       ToastBus.push({ message: "Saved" });
       router.refresh();
+    } catch (error) {
+      ToastBus.push({
+        message: error instanceof Error ? error.message : "Could not save the template",
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const onLogoSelected = async (f: File | null) => {
-    if (!f || mode !== "edit" || !templateId) return;
-    if (f.size > 5 * 1024 * 1024) {
+  const onLogoSelected = async (file: File | null) => {
+    if (!file || mode !== "edit" || !templateId || logoBusy) return;
+    if (file.size > 5 * 1024 * 1024) {
       ToastBus.push({ message: "Logo must be 5MB or smaller." });
       return;
     }
-    const fd = new FormData();
-    fd.set("file", f);
-    const res = await fetch(`/api/admin/templates/${templateId}/logo`, {
-      method: "POST",
-      credentials: "include",
-      body: fd,
-    });
-    const data = (await res.json().catch(() => ({}))) as { logoUrl?: string; error?: string };
-    if (!res.ok || !data.logoUrl) {
-      ToastBus.push({ message: data.error || "Upload failed" });
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      ToastBus.push({ message: "Use a PNG or JPG logo." });
       return;
     }
-    setLogoUrl(data.logoUrl);
-    ToastBus.push({ message: "Logo updated" });
-    router.refresh();
+    setLogoBusy(true);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch(`/api/admin/templates/${templateId}/logo`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.logoUrl)
+        throw new Error(payload.error || "Could not upload logo");
+      setLogoUrl(payload.logoUrl);
+      ToastBus.push({ message: "Logo updated" });
+      router.refresh();
+    } catch (error) {
+      ToastBus.push({ message: error instanceof Error ? error.message : "Could not upload logo" });
+    } finally {
+      setLogoBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   const onRemoveLogo = async () => {
-    if (!templateId) return;
-    const res = await fetch(`/api/admin/templates/${templateId}/logo`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!res.ok) {
-      ToastBus.push({ message: "Couldn't remove logo" });
-      return;
+    if (!templateId || logoBusy) return;
+    setLogoBusy(true);
+    try {
+      const response = await fetch(`/api/admin/templates/${templateId}/logo`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Could not remove logo");
+      setLogoUrl(null);
+      ToastBus.push({ message: "Logo removed" });
+      router.refresh();
+    } catch (error) {
+      ToastBus.push({ message: error instanceof Error ? error.message : "Could not remove logo" });
+    } finally {
+      setLogoBusy(false);
     }
-    setLogoUrl(null);
-    ToastBus.push({ message: "Logo removed" });
-    router.refresh();
   };
 
   const confirmDeleteTemplate = async () => {
@@ -326,7 +356,7 @@ export function ReportTemplateEditor({
           </Link>
         }
         title={mode === "create" ? "New template" : "Edit template"}
-        subtitle="Logo and layout stay here for teachers; tone and section notes go to the assistant."
+        subtitle="Choose the report fields and their order, upload your logo, and assign the layout to classrooms. Changes apply to new reports."
         actions={
           mode === "edit" ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -371,7 +401,7 @@ export function ReportTemplateEditor({
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                Short description (teachers see this when picking)
+                Short description
               </span>
               <Input
                 value={description}
@@ -387,11 +417,14 @@ export function ReportTemplateEditor({
                 <select
                   className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
                   value={kind}
-                  onChange={(e) => setKind(e.target.value as (typeof KINDS)[number])}
+                  onChange={(e) => {
+                    setKind(e.target.value as (typeof KINDS)[number]);
+                    setDefaultFor(null);
+                  }}
                 >
                   {KINDS.map((k) => (
                     <option key={k} value={k}>
-                      {k}
+                      {k === "Major" ? "End-of-term" : k}
                     </option>
                   ))}
                 </select>
@@ -413,38 +446,24 @@ export function ReportTemplateEditor({
                 </select>
               </label>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                  Reporting period
-                </span>
+            {kind === "Major" ? (
+              <label style={{ display: "grid", gap: 6 }}>
+                <span className="label-cap text-ink-muted">Use automatically for</span>
                 <select
                   className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
-                  value={reportingPeriod ?? ""}
-                  onChange={(e) => setReportingPeriod((e.target.value as ReportingPeriod) || null)}
+                  value={defaultFor ?? ""}
+                  onChange={(event) =>
+                    setDefaultFor((event.target.value || null) as DefaultClassroomGroup | null)
+                  }
                 >
-                  <option value="">None</option>
-                  {REPORTING_PERIOD_VALUES.map((p) => (
-                    <option key={p} value={p}>
-                      {REPORTING_PERIOD_LABEL[p]}
-                    </option>
-                  ))}
+                  <option value="">No automatic assignment</option>
+                  <option value="all">All classrooms (unless they have their own default)</option>
+                  <option value="elementary">Elementary</option>
+                  <option value="childrens_house">Children’s House</option>
+                  <option value="toddler_house">Toddler’s House</option>
                 </select>
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                  AI context
-                </span>
-                <select
-                  className="flex h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
-                  value={contextMode}
-                  onChange={(e) => setContextMode(e.target.value as ContextModeDefault)}
-                >
-                  <option value="history">Child history</option>
-                  <option value="input_only">Current input only</option>
-                </select>
-              </label>
-            </div>
+            ) : null}
           </div>
         </div>
 
@@ -463,15 +482,21 @@ export function ReportTemplateEditor({
                 lineHeight: 1.45,
               }}
             >
-              Shown at the top of the report for families. Not sent to the writing assistant.
+              Shown at the top of the report for families. Use PNG or JPG for the most reliable PDF
+              output.
             </p>
             {logoUrl ? (
               <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                <img src={logoUrl} alt="" style={{ maxHeight: 48, objectFit: "contain" }} />
+                <img
+                  src={logoUrl}
+                  alt="School logo preview"
+                  style={{ maxHeight: 64, maxWidth: "100%", objectFit: "contain" }}
+                />
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={logoBusy}
                   onClick={() => void onRemoveLogo()}
                 >
                   Remove logo
@@ -483,7 +508,7 @@ export function ReportTemplateEditor({
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                  accept="image/png,image/jpeg"
                   className="hidden"
                   onChange={(e) => void onLogoSelected(e.target.files?.[0] ?? null)}
                 />
@@ -491,9 +516,10 @@ export function ReportTemplateEditor({
                   type="button"
                   variant="secondary"
                   size="sm"
+                  disabled={logoBusy}
                   onClick={() => fileRef.current?.click()}
                 >
-                  Upload logo
+                  {logoBusy ? "Uploading…" : "Upload logo"}
                 </Button>
               </>
             ) : (
@@ -508,28 +534,6 @@ export function ReportTemplateEditor({
                 Save the template first, then you can upload a logo.
               </p>
             )}
-          </div>
-        </div>
-
-        <HandDivider />
-
-        <div style={{ ...cardStyle, marginTop: 18 }}>
-          <div style={{ ...cardHeaderStyle, borderBottom: "1px solid var(--color-border)" }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Writing style</span>
-          </div>
-          <div style={{ padding: 18 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
-                Tone and voice (assistant only)
-              </span>
-              <Textarea
-                value={writingStyle}
-                onChange={(e) => setWritingStyle(e.target.value)}
-                placeholder="e.g. Warm and concise; lead with observations; avoid jargon; address parents as partners."
-                rows={5}
-                className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
-              />
-            </label>
           </div>
         </div>
 
@@ -556,7 +560,7 @@ export function ReportTemplateEditor({
                   lineHeight: 1.35,
                 }}
               >
-                Drag the grip to reorder.
+                Drag the grip or use the arrows to reorder.
               </span>
             ) : null}
             <Button
@@ -564,6 +568,7 @@ export function ReportTemplateEditor({
               variant="ghost"
               size="sm"
               className="ml-auto h-8 gap-1 text-[var(--color-terracotta)]"
+              disabled={bundles.length >= 20}
               onClick={() => setBundles((b) => [...b, { id: newRowId(), row: emptySection() }])}
             >
               <Plus size={14} strokeWidth={2} />
@@ -660,17 +665,39 @@ export function ReportTemplateEditor({
                       <span className="label-cap" style={{ color: "var(--color-ink-muted)" }}>
                         Section {i + 1}
                       </span>
-                      <button
-                        type="button"
-                        className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-terracotta-deep)]"
-                        aria-label="Remove section"
-                        onClick={() =>
-                          bundles.length > 1 && setBundles((b) => b.filter((_, j) => j !== i))
-                        }
-                        disabled={bundles.length <= 1}
-                      >
-                        <Trash2 size={16} strokeWidth={1.6} />
-                      </button>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Move section ${i + 1} up`}
+                          disabled={i === 0}
+                          onClick={() => reorderBundles(i, i - 1)}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Move section ${i + 1} down`}
+                          disabled={i === bundles.length - 1}
+                          onClick={() => reorderBundles(i, i + 1)}
+                        >
+                          ↓
+                        </Button>
+                        <button
+                          type="button"
+                          className="tap rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-terracotta-deep)]"
+                          aria-label="Remove section"
+                          onClick={() =>
+                            bundles.length > 1 && setBundles((b) => b.filter((_, j) => j !== i))
+                          }
+                          disabled={bundles.length <= 1}
+                        >
+                          <Trash2 size={16} strokeWidth={1.6} />
+                        </button>
+                      </div>
                     </div>
                     <Input
                       value={row.section}
@@ -681,6 +708,7 @@ export function ReportTemplateEditor({
                           )
                         )
                       }
+                      aria-label={`Section ${i + 1} heading`}
                       placeholder="Section heading"
                       className="mb-2"
                     />
@@ -697,7 +725,8 @@ export function ReportTemplateEditor({
                         Field type
                       </span>
                       <select
-                        className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-ink)]"
+                        className="h-9 w-full min-w-0 max-w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-ink)]"
+                        aria-label={`Section ${i + 1} field type`}
                         value={row.fieldType ?? "text"}
                         onChange={(e) => {
                           const next = e.target.value as TemplateSectionRow["fieldType"];
@@ -727,6 +756,25 @@ export function ReportTemplateEditor({
                         <option value="single_select">Single-select</option>
                         <option value="hardcoded">Fixed text (school boilerplate)</option>
                         <option value="curriculum">Curriculum (speech targets)</option>
+                        <option value="manual_text">Teacher-entered text</option>
+                        {kind === "Major" ? (
+                          <>
+                            <option value="progress_summary">
+                              Curriculum progress (automatic)
+                            </option>
+                            <option value="exam_grades">
+                              Exam grades and overall average (automatic)
+                            </option>
+                            <option value="term_skills">Skills report (teacher ratings)</option>
+                            <option value="director_comment">
+                              Director’s comment (admin only)
+                            </option>
+                            <option value="incident_highlights">Incident report highlights</option>
+                            <option value="daily_highlights">Daily report highlights</option>
+                            <option value="sen_highlights">SEN report highlights</option>
+                            <option value="project_highlights">Project letter highlights</option>
+                          </>
+                        ) : null}
                       </select>
                     </div>
                     {row.fieldType === "checklist" || row.fieldType === "single_select" ? (
@@ -764,10 +812,31 @@ export function ReportTemplateEditor({
                             )
                           )
                         }
-                        placeholder="Optional: extra instructions for the assistant. Section body is auto-filled from the child’s speech targets (Curriculum → Speech)."
+                        placeholder="Optional notes. This section is filled from the child’s speech targets."
                         rows={3}
                         className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
                       />
+                    ) : [
+                        "progress_summary",
+                        "exam_grades",
+                        "term_skills",
+                        "director_comment",
+                        "daily_highlights",
+                        "sen_highlights",
+                        "incident_highlights",
+                        "project_highlights",
+                      ].includes(row.fieldType) ? (
+                      <p className="text-xs leading-relaxed text-ink-secondary">
+                        {row.fieldType === "progress_summary"
+                          ? "Adds the child’s curriculum subjects, progress and subject comments in this position."
+                          : row.fieldType === "exam_grades"
+                            ? "Uses the selected term’s saved subject scores and your school’s grading scale. Only shown for Elementary classrooms."
+                            : row.fieldType === "term_skills"
+                              ? "Starts with unrated skills for the teacher to complete."
+                              : row.fieldType === "director_comment"
+                                ? "Only an admin can fill in this field during review."
+                                : "Includes reports already shared with this family during the selected term. Remove this block to leave those highlights out."}
+                      </p>
                     ) : (
                       <Textarea
                         value={row.description}
@@ -778,7 +847,7 @@ export function ReportTemplateEditor({
                             )
                           )
                         }
-                        placeholder="What should the assistant write here? Facts to include, length, tone for this block."
+                        placeholder="Optional notes about what belongs in this section."
                         rows={4}
                         className="resize-y border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink)]"
                       />
@@ -791,7 +860,7 @@ export function ReportTemplateEditor({
         </div>
 
         <div style={{ marginTop: 28, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Button type="button" disabled={saving} onClick={() => void onSave()}>
+          <Button type="button" disabled={saving || logoBusy} onClick={() => void onSave()}>
             {saving ? "Saving…" : "Save template"}
           </Button>
           <Button type="button" variant="outline" asChild>

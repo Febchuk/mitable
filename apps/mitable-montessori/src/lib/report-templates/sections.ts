@@ -19,6 +19,15 @@ export const TEMPLATE_FIELD_TYPES = [
   "single_select",
   "hardcoded",
   "curriculum",
+  "progress_summary",
+  "exam_grades",
+  "term_skills",
+  "manual_text",
+  "director_comment",
+  "daily_highlights",
+  "sen_highlights",
+  "incident_highlights",
+  "project_highlights",
 ] as const;
 export type TemplateFieldType = (typeof TEMPLATE_FIELD_TYPES)[number];
 
@@ -57,13 +66,31 @@ export const TemplateSectionRowSchema = z
     }
   });
 
+export const DEFAULT_CLASSROOM_GROUPS = [
+  "all",
+  "elementary",
+  "childrens_house",
+  "toddler_house",
+] as const;
+export type DefaultClassroomGroup = (typeof DEFAULT_CLASSROOM_GROUPS)[number];
+export const DefaultClassroomGroupSchema = z.enum(DEFAULT_CLASSROOM_GROUPS).nullable();
+
 export const TemplateSectionsSchema = z
   .array(TemplateSectionRowSchema)
   .min(1)
   .max(20)
   .refine((rows) => new Set(rows.map((r) => r.section)).size === rows.length, {
     message: "Each section title must be unique",
-  });
+  })
+  .refine(
+    (rows) =>
+      ["progress_summary", "exam_grades", "term_skills", "director_comment"].every(
+        (type) => rows.filter((row) => row.fieldType === type).length <= 1
+      ),
+    {
+      message: "Use each progress, exam grades, skills and director comment block only once.",
+    }
+  );
 
 export type TemplateSectionRow = z.infer<typeof TemplateSectionRowSchema>;
 
@@ -75,7 +102,8 @@ export type SectionMetaEntry =
   | { type: "single_select"; options: string[] }
   | { type: "curriculum"; program: CurriculumProgram }
   | { type: "progress_topic"; topicId: string }
-  | { type: "term_history" }
+  | { type: "term_history"; reportType?: "daily" | "sen" | "incident" | "project" }
+  | { type: "progress_summary" }
   | { type: "term_skills" }
   | { type: "director_comment" }
   | { type: "exam_grades"; termId: string | null };
@@ -85,6 +113,7 @@ export type SectionMeta = Record<string, SectionMetaEntry>;
 /** Sections preserved or filled server-side rather than written by the drafting agent. */
 export function sectionExcludedFromAgent(meta: SectionMetaEntry | undefined): boolean {
   return (
+    meta?.type === "progress_summary" ||
     meta?.type === "hardcoded" ||
     meta?.type === "curriculum" ||
     meta?.type === "progress_topic" ||
@@ -103,7 +132,25 @@ export function rowsToDb(rows: TemplateSectionRow[]): {
 } {
   const section_meta: SectionMeta = {};
   for (const r of rows) {
-    if (r.fieldType === "checklist") {
+    if (
+      r.fieldType === "progress_summary" ||
+      r.fieldType === "term_skills" ||
+      r.fieldType === "manual_text" ||
+      r.fieldType === "director_comment"
+    ) {
+      section_meta[r.section] = { type: r.fieldType };
+    } else if (r.fieldType === "exam_grades") {
+      section_meta[r.section] = { type: "exam_grades", termId: null };
+    } else if (r.fieldType.endsWith("_highlights")) {
+      section_meta[r.section] = {
+        type: "term_history",
+        reportType: r.fieldType.replace("_highlights", "") as
+          | "daily"
+          | "sen"
+          | "incident"
+          | "project",
+      };
+    } else if (r.fieldType === "checklist") {
       section_meta[r.section] = { type: "checklist", options: r.options };
     } else if (r.fieldType === "single_select") {
       section_meta[r.section] = { type: "single_select", options: r.options };
@@ -132,6 +179,26 @@ export function dbToRows(
   const m = meta ?? {};
   return sections.map((section) => {
     const entry = m[section];
+    if (
+      entry &&
+      [
+        "progress_summary",
+        "exam_grades",
+        "term_skills",
+        "manual_text",
+        "director_comment",
+        "term_history",
+      ].includes(entry.type)
+    ) {
+      const fieldType =
+        entry.type === "term_history" ? `${entry.reportType ?? "incident"}_highlights` : entry.type;
+      return {
+        section,
+        description: g[section] ?? "",
+        fieldType: fieldType as TemplateFieldType,
+        options: [],
+      };
+    }
     if (entry?.type === "checklist") {
       return {
         section,

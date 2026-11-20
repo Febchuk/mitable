@@ -30,6 +30,7 @@ export function ParentReportView({
   fallbackBody,
   media,
   schoolName,
+  logoUrl,
 }: {
   title: string;
   studentName: string;
@@ -39,16 +40,17 @@ export function ParentReportView({
   fallbackBody: string;
   media: ReportMediaItem[];
   schoolName?: string | null;
+  logoUrl?: string | null;
 }) {
   const brand = getSchoolBranding(schoolName);
   return (
-    <article className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+    <article className="mx-auto max-w-4xl min-w-0 break-words overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
       <header className="border-b border-border px-6 py-8 sm:px-10 sm:py-10">
-        {brand ? (
+        {logoUrl || brand ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={brand.logoPath}
-            alt={brand.name}
+            src={logoUrl || brand!.logoPath}
+            alt={brand?.name || schoolName || "School logo"}
             className="mb-6 h-20 w-auto max-w-full object-contain"
           />
         ) : null}
@@ -188,7 +190,7 @@ function SubjectBlock({ block }: { block: Extract<ReportPdfBlock, { kind: "subje
               <ul className="mt-2 divide-y divide-border/70">
                 {group.rows.map((row) => (
                   <li key={row.name} className="flex items-center justify-between gap-4 py-2.5">
-                    <div>
+                    <div className="min-w-0 break-words">
                       <p className="text-sm text-ink">{row.name}</p>
                       {row.comment ? (
                         <p className="mt-1 text-sm text-ink-secondary">{row.comment}</p>

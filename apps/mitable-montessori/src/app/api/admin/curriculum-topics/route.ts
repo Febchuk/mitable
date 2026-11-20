@@ -1,3 +1,4 @@
+import { removeCurriculumTopic } from "@/lib/admin/crud";
 import { z } from "zod";
 import { adminWriteRoute } from "@/lib/admin/route-helper";
 import {
@@ -48,6 +49,18 @@ export async function PATCH(req: Request) {
         id: input.topic_id,
         meta: { marking_schema: input.marking_schema },
       };
+    }
+  );
+}
+
+export async function DELETE(req: Request) {
+  return adminWriteRoute(
+    req,
+    z.object({ topic_id: z.string().uuid() }),
+    "admin_remove_curriculum_topic",
+    async (input, ctx) => {
+      await removeCurriculumTopic(ctx, input.topic_id);
+      return { id: input.topic_id };
     }
   );
 }

@@ -25,7 +25,7 @@ const shared = (id: string, type = "daily", extra: Record<string, unknown> = {})
   ...extra,
 });
 describe("shared term report compilation", () => {
-  it("includes all four report types and excludes other terms, children, schools, drafts and major reports", async () => {
+  it("keeps incident highlights by default and excludes repeated report types, other terms, children, schools, drafts and major reports", async () => {
     const fixture = toddlerReportFixture();
     fixture.tables.reports = [
       shared("daily"),
@@ -41,17 +41,14 @@ describe("shared term report compilation", () => {
     ];
     const built = await buildTermHistorySections(fixture.db, scope);
     expect(built.sections.map((section) => section.heading)).toEqual([
-      "Daily reports — term highlights",
-      "SEN reports — term highlights",
       "Incident reports — term highlights",
-      "Project letters — term highlights",
     ]);
     const text = built.sections
       .map((section) => fieldPayloadToReadableText(section.paragraphs[0].html))
       .join("\n");
     expect(text).toContain("A recorded note.");
     expect(text).not.toMatch(/Outside term|Private|Unfinished|Previous summary/);
-    expect(buildReportPdfBlocks(built.sections, built.sectionMeta)).toHaveLength(4);
+    expect(buildReportPdfBlocks(built.sections, built.sectionMeta)).toHaveLength(1);
   });
   it("groups repeated notes, keeps combined daily/SEN fields, and omits duplicate progress and boilerplate", async () => {
     const fixture = toddlerReportFixture();
@@ -82,7 +79,7 @@ describe("shared term report compilation", () => {
       shared("one", "daily", { sections, section_meta }),
       shared("two", "daily", { report_date: "2026-10-21", sections, section_meta }),
     ];
-    const built = await buildTermHistorySections(fixture.db, scope);
+    const built = await buildTermHistorySections(fixture.db, scope, ["daily"]);
     const text = fieldPayloadToReadableText(built.sections[0].paragraphs[0].html);
     expect(text).toContain("2 reports shared");
     expect(text.match(/Practised turn taking\./g)).toHaveLength(1);
@@ -94,7 +91,7 @@ describe("shared term report compilation", () => {
   it("loads every page rather than cutting off a busy term", async () => {
     const fixture = toddlerReportFixture();
     fixture.tables.reports = Array.from({ length: 1001 }, (_, index) => shared(String(index)));
-    const built = await buildTermHistorySections(fixture.db, scope);
+    const built = await buildTermHistorySections(fixture.db, scope, ["daily"]);
     expect(fieldPayloadToReadableText(built.sections[0].paragraphs[0].html)).toContain(
       "1001 reports shared"
     );

@@ -1,3 +1,5 @@
+import { averageScore, overallLetterGrade, type GradingScale } from "@/lib/grades/grading-scale";
+import { getSchoolGradingScale } from "@/lib/queries/grading-scale";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
   getCurrentUserContext,
@@ -42,6 +44,8 @@ export type ElementaryGradesPageData = {
   students: ElementaryGradeStudent[];
   grades: ElementaryExamGrade[];
   termComments: ElementaryTermGradeComment[];
+  subjects: Array<{ classroomId: string; name: string }>;
+  gradingScale: GradingScale | null;
 };
 
 function isMissingTermCommentsTable(error: { code?: string; message?: string } | null): boolean {
@@ -62,34 +66,66 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
 
   const admin = createAdminClient();
   const classroomIds = classrooms.map((classroom) => classroom.id);
-  const [terms, enrollmentResp, gradesResp, termCommentsResp] = await Promise.all([
-    listSchoolTerms(admin, ctx.schoolId),
-    admin
-      .from("student_classroom_enrollments")
-      .select("classroom_id, students!inner(id, first_name, last_name, preferred_name, school_id)")
-      .in("classroom_id", classroomIds)
-      .is("end_date", null)
-      .eq("students.school_id", ctx.schoolId),
-    admin
-      .from("elementary_exam_grades")
-      .select(
-        "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, ca_score, class_participation_score, afl_score, comments, updated_at"
-      )
-      .eq("school_id", ctx.schoolId)
-      .in("classroom_id", classroomIds)
-      .order("subject"),
-    admin
-      .from("elementary_term_grade_comments")
-      .select("classroom_id, student_id, term_id, comment, overall_grade_label")
-      .eq("school_id", ctx.schoolId)
-      .in("classroom_id", classroomIds),
-  ]);
+  const [terms, enrollmentResp, gradesResp, termCommentsResp, gradingScale, classroomResp] =
+    await Promise.all([
+      listSchoolTerms(admin, ctx.schoolId),
+      admin
+        .from("student_classroom_enrollments")
+        .select(
+          "classroom_id, students!inner(id, first_name, last_name, preferred_name, school_id)"
+        )
+        .in("classroom_id", classroomIds)
+        .is("end_date", null)
+        .eq("students.school_id", ctx.schoolId),
+      admin
+        .from("elementary_exam_grades")
+        .select(
+          "id, classroom_id, student_id, term_id, subject, assessment_name, percentage, grade_label, ca_score, class_participation_score, afl_score, comments, updated_at"
+        )
+        .eq("school_id", ctx.schoolId)
+        .in("classroom_id", classroomIds)
+        .order("subject"),
+      admin
+        .from("elementary_term_grade_comments")
+        .select("classroom_id, student_id, term_id, comment, overall_grade_label")
+        .eq("school_id", ctx.schoolId)
+        .in("classroom_id", classroomIds),
+      getSchoolGradingScale(admin, ctx.schoolId),
+      admin
+        .from("classrooms")
+        .select("id, curriculum_id")
+        .eq("school_id", ctx.schoolId)
+        .in("id", classroomIds),
+    ]);
 
   if (enrollmentResp.error) throw new Error(enrollmentResp.error.message);
   if (gradesResp.error) throw new Error(gradesResp.error.message);
   if (termCommentsResp.error && !isMissingTermCommentsTable(termCommentsResp.error)) {
     throw new Error(termCommentsResp.error.message);
   }
+
+  if (classroomResp.error) throw new Error(classroomResp.error.message);
+  const curriculumIds = [
+    ...new Set(
+      (classroomResp.data ?? []).flatMap((room) =>
+        room.curriculum_id ? [room.curriculum_id as string] : []
+      )
+    ),
+  ];
+  const subjectResp = curriculumIds.length
+    ? await admin
+        .from("curriculum_subjects")
+        .select("curriculum_id, name, sort_order")
+        .in("curriculum_id", curriculumIds)
+        .eq("is_active", true)
+        .order("sort_order")
+    : { data: [], error: null };
+  if (subjectResp.error) throw new Error(subjectResp.error.message);
+  const subjects = (classroomResp.data ?? []).flatMap((room) =>
+    (subjectResp.data ?? [])
+      .filter((subject) => subject.curriculum_id === room.curriculum_id)
+      .map((subject) => ({ classroomId: room.id as string, name: subject.name as string }))
+  );
 
   const students = (enrollmentResp.data ?? []).flatMap((raw) => {
     const row = raw as unknown as {
@@ -123,6 +159,8 @@ export async function getElementaryGradesPageData(): Promise<ElementaryGradesPag
   return {
     classrooms: classrooms.map(({ id, name }) => ({ id, name })),
     terms,
+    subjects,
+    gradingScale,
     students: students.sort((a, b) => a.name.localeCompare(b.name)),
     grades: (gradesResp.data ?? []).map((raw) => {
       const row = raw as Record<string, unknown>;
@@ -196,26 +234,33 @@ export async function listStudentExamGradesForTerm(args: {
   });
 }
 
-export async function getStudentTermGradeFeedback(args: {
-  schoolId: string;
-  classroomId: string;
-  studentId: string;
-  termId: string;
-}): Promise<{ comment: string | null; overallGradeLabel: string | null }> {
+export async function getStudentTermGradeFeedback(
+  args: {
+    schoolId: string;
+    classroomId: string;
+    studentId: string;
+    termId: string;
+  },
+  savedGrades?: ElementaryExamGrade[]
+): Promise<{ comment: string | null; overallGradeLabel: string | null }> {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("elementary_term_grade_comments")
-    .select("comment, overall_grade_label")
-    .eq("school_id", args.schoolId)
-    .eq("classroom_id", args.classroomId)
-    .eq("student_id", args.studentId)
-    .eq("term_id", args.termId)
-    .maybeSingle();
-  if (error && !isMissingTermCommentsTable(error)) throw new Error(error.message);
-  if (isMissingTermCommentsTable(error)) return { comment: null, overallGradeLabel: null };
+  const [feedback, grades, scale] = await Promise.all([
+    admin
+      .from("elementary_term_grade_comments")
+      .select("comment")
+      .eq("school_id", args.schoolId)
+      .eq("classroom_id", args.classroomId)
+      .eq("student_id", args.studentId)
+      .eq("term_id", args.termId)
+      .maybeSingle(),
+    savedGrades ?? listStudentExamGradesForTerm(args),
+    getSchoolGradingScale(admin, args.schoolId),
+  ]);
+  if (feedback.error && !isMissingTermCommentsTable(feedback.error))
+    throw new Error(feedback.error.message);
   return {
-    comment: (data?.comment as string | null | undefined) || null,
-    overallGradeLabel: (data?.overall_grade_label as string | null | undefined) ?? null,
+    comment: (feedback.data?.comment as string | null | undefined) || null,
+    overallGradeLabel: overallLetterGrade(averageScore(grades), scale),
   };
 }
 

@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    await sendReport(
+    const publication = await sendReport(
       {
         supabase,
         reportId: parsed.data.reportId,
@@ -98,9 +98,9 @@ export async function POST(req: Request) {
     // trigger delivery without needing to call the admin-only drain endpoint.
     const sender = hasResendKey ? new ResendEmailSender() : new StubEmailSender();
     const drain = await drainPendingReports(supabase, sender, {
-      reportId: parsed.data.reportId,
+      reportId: publication.reportId,
     });
-    if (drain.failed > 0) {
+    if (drain.failed > 0 || drain.needsReview > 0) {
       const detail = drain.failures
         .map((f) => f.error)
         .filter(Boolean)
@@ -109,9 +109,11 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            drain.sent === 0
-              ? `Couldn't deliver the report email${detail ? `: ${detail}` : "."}`
-              : `Delivered to ${drain.sent} guardian(s), but ${drain.failed} failed${detail ? `: ${detail}` : "."}`,
+            drain.needsReview > 0
+              ? "The report is shared. An admin needs to check whether the earlier email arrived before it can be retried. No repeat email was sent."
+              : drain.sent === 0
+                ? `Couldn't deliver the report email${detail ? `: ${detail}` : "."}`
+                : `Delivered to ${drain.sent} guardian(s), but ${drain.failed} failed${detail ? `: ${detail}` : "."}`,
           recipientCount: links.length,
           drain,
         },
@@ -121,6 +123,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       recipientCount: links.length,
+      publication,
       drain,
     });
   } catch (err) {

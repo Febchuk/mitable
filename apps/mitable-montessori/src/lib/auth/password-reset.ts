@@ -1,3 +1,4 @@
+import { safeParentRedirect } from "@/lib/parents/redirect";
 export type PasswordResetAudience = "staff" | "parent";
 
 export const PRODUCTION_APP_ORIGIN = "https://www.mitable.ng";
@@ -22,9 +23,14 @@ function passwordResetOrigin(requestOrigin: string): string {
   }
 }
 
-export function passwordResetCallbackUrl(origin: string, audience: PasswordResetAudience): string {
-  const updatePath =
-    audience === "parent" ? "/update-password?audience=parent" : "/update-password";
+export function passwordResetCallbackUrl(
+  origin: string,
+  audience: PasswordResetAudience,
+  destination?: string | null
+): string {
+  let updatePath = audience === "parent" ? "/update-password?audience=parent" : "/update-password";
+  const next = audience === "parent" ? safeParentRedirect(destination) : null;
+  if (next) updatePath += `&redirect=${encodeURIComponent(next)}`;
   return `${passwordResetOrigin(origin)}/auth/callback?redirect=${encodeURIComponent(updatePath)}`;
 }
 

@@ -116,6 +116,7 @@ export async function findSubtopicByName(
   const { data } = await ctx.supabase
     .from("curriculum_subtopics")
     .select("id, name, topic_id, curriculum_topics!inner(curriculum_id)")
+    .eq("is_active", true)
     .eq("curriculum_topics.curriculum_id", curriculumRef)
     .ilike("name", `%${search}%`)
     .limit(10);

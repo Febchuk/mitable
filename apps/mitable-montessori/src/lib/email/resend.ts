@@ -228,6 +228,7 @@ export class ResendEmailSender implements EmailSender {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "Idempotency-Key": `report/${job.recipientId}`,
         },
         body: JSON.stringify(payload),
       });
@@ -238,7 +239,8 @@ export class ResendEmailSender implements EmailSender {
       }
 
       const json = (await res.json()) as { id?: string };
-      return { ok: true, messageId: json.id ?? undefined };
+      if (!json.id) return { ok: false, error: "Email provider did not confirm a message ID" };
+      return { ok: true, messageId: json.id };
     } catch (err) {
       return { ok: false, error: (err as Error).message };
     }

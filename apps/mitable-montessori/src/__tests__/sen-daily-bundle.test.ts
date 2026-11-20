@@ -44,6 +44,7 @@ beforeEach(() => {
   mocks.db = {
     ...fixture.db,
     rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name === "publish_report") return fixture.db.rpc(name, args);
       expect(name).toBe("consolidate_sen_daily_drafts");
       if (fixture.failures.has("consolidation")) return { data: null, error: { message: "retry" } };
       const canonical = fixture.tables.reports.find(

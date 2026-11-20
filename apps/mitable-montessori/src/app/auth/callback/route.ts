@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { appHomePathForRole, teacherAppHomePath } from "@/lib/feature-flags";
 import { safeAuthRedirect } from "@/lib/auth/password-reset";
 import { getAppUrl } from "@/lib/utils/app-url";
+import { safeParentRedirect } from "@/lib/parents/redirect";
 
 /**
  * OAuth callback. Supabase Auth redirects here with `?code=...` after Google
@@ -27,25 +28,50 @@ export async function GET(req: NextRequest) {
   const defaultHome = "/";
   const requested = searchParams.get("redirect") ?? defaultHome;
   const safeRedirect = safeAuthRedirect(requested, defaultHome);
+  const requestedPage = new URL(safeRedirect, origin);
+  const failureRedirect = (message: string) => {
+    if (
+      requestedPage.pathname === "/update-password" &&
+      requestedPage.searchParams.get("audience") === "parent"
+    ) {
+      const retry = new URL("/forgot-password?audience=parent&error=recovery_expired", origin);
+      const destination = safeParentRedirect(requestedPage.searchParams.get("redirect"));
+      if (destination) retry.searchParams.set("redirect", destination);
+      return NextResponse.redirect(retry);
+    }
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, origin));
+  };
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=no_code", origin));
+    return failureRedirect("no_code");
   }
 
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(error.message)}`, origin)
-    );
+    return failureRedirect(error.message);
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.redirect(new URL("/login?error=no_user", origin));
+    return failureRedirect("no_user");
+  }
+
+  // Recovery sessions belong to either staff or guardians. They must reach
+  // the password form before any staff-profile or signup routing.
+  if (new URL(safeRedirect, origin).pathname === "/update-password") {
+    return NextResponse.redirect(new URL(safeRedirect, origin));
+  }
+  const { data: guardian } = await supabase
+    .from("guardians")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (guardian && (safeRedirect.startsWith("/parents/") || safeRedirect === "/")) {
+    return NextResponse.redirect(new URL(safeRedirect === "/" ? "/parents" : safeRedirect, origin));
   }
 
   // Does this auth user have a Mitable users row yet?

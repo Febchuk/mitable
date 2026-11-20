@@ -70,7 +70,7 @@ function ParentLoginInner() {
           <span className="flex items-baseline justify-between gap-3">
             Password
             <Link
-              href="/forgot-password?audience=parent"
+              href={`/forgot-password?audience=parent${safeParentRedirect(params.get("redirect")) ? `&redirect=${encodeURIComponent(safeParentRedirect(params.get("redirect"))!)}` : ""}`}
               className="text-xs font-normal text-terracotta underline underline-offset-2"
             >
               Forgot password?

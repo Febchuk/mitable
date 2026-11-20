@@ -107,7 +107,7 @@ it("refreshes late Daily Log and Progress edits at send time and keeps teacher a
   ])
     expect(snapshot).toContain(text);
   fixture.tables.toddler_daily_logs[0].teacher_comments = "Changed after sending";
-  expect((await send(request({ reportId, guardianRefs: [GUARDIAN] }))).status).toBe(409);
+  expect((await send(request({ reportId, guardianRefs: [GUARDIAN] }))).status).toBe(200);
   expect(JSON.stringify(report.sections)).toBe(snapshot);
 });
 

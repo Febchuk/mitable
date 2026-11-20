@@ -1,3 +1,4 @@
+import { activeCurriculumTree } from "@/lib/curriculum/active-tree";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import {
@@ -74,7 +75,7 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
     supabase
       .from("student_progress")
       .select(
-        "id, curriculum_subtopic_id, status, comment, updated_at, curriculum_subtopics(id, name, sort_order, topic_id, curriculum_topics(id, name, sort_order, marking_schema))"
+        "id, curriculum_subtopic_id, status, comment, updated_at, curriculum_subtopics(id, name, sort_order, topic_id, curriculum_topics(id, name, sort_order, is_active, marking_schema))"
       )
       .eq("student_id", studentId)
       .returns<ProgressRow[]>(),
@@ -120,7 +121,7 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
     const { data: subjects, error } = await supabase
       .from("curriculum_subjects")
       .select(
-        "sort_order, curriculum_topics(id, name, sort_order, marking_schema, curriculum_subtopics(id, name, sort_order))"
+        "is_active, sort_order, curriculum_topics(id, name, sort_order, is_active, marking_schema, curriculum_subtopics(id, name, sort_order, is_active))"
       )
       .eq("curriculum_id", curriculumId)
       .returns<SubjectRow[]>();
@@ -130,7 +131,7 @@ export async function listCurriculumProgress(studentId: string): Promise<Curricu
     );
     // Start with the assigned curriculum, not saved marks: an unmarked lesson
     // still belongs in the child's Progress view.
-    return [...(subjects ?? [])]
+    return [...activeCurriculumTree(subjects ?? [])]
       .sort((a, b) => a.sort_order - b.sort_order)
       .flatMap((subject) =>
         [...(subject.curriculum_topics ?? [])]

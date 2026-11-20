@@ -58,7 +58,7 @@ async function applyTransition(
   const { data: report, error: readErr } = await ctx.supabase
     .from("reports")
     .select(
-      "id, status, report_type, student_id, classroom_id, report_date, period_start, period_end, sections, section_meta, section_guidance, sen_daily_report_id, term_id"
+      "id, updated_at, template_id, title, body, status, report_type, student_id, classroom_id, report_date, period_start, period_end, sections, section_meta, section_guidance, sen_daily_report_id, term_id"
     )
     .eq("id", ctx.reportId)
     .maybeSingle();
@@ -108,6 +108,7 @@ async function applyTransition(
     const grades = await elementaryGradeSnapshot(ctx.supabase, {
       ...report,
       sections: progress?.sections ?? report.sections,
+      section_meta: progress?.section_meta ?? report.section_meta,
     });
     if (grades) Object.assign(update, grades);
   }
@@ -142,19 +143,111 @@ export async function approveReport(ctx: TransitionContext) {
 export async function sendReport(
   ctx: TransitionContext,
   guardianRefs: string[],
-  guardianEmailMap: Record<string, string>,
+  _guardianEmailMap: Record<string, string>,
   messageBody?: string
 ) {
-  await applyTransition(ctx, "sent", null);
-  const rows = guardianRefs.map((gid) => ({
-    report_id: ctx.reportId,
-    guardian_id: gid,
-    email_snapshot: guardianEmailMap[gid] ?? null,
-    delivery_status: "pending" as const,
-    message_body: messageBody ?? null,
-  }));
-  const { error } = await ctx.supabase.from("report_recipients").insert(rows);
+  const { data: source, error: readError } = await ctx.supabase
+    .from("reports")
+    .select("*")
+    .eq("id", ctx.reportId)
+    .maybeSingle();
+  if (readError || !source) throw new WorkflowError("Report not found", "not_found");
+  let snapshot = { ...source };
+  let alreadyPublished = false;
+  if (source.status === "sent") {
+    const { data: publication, error } = await ctx.supabase
+      .from("report_publications")
+      .select("snapshot")
+      .eq("report_id", source.id)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error)
+      throw new WorkflowError("Could not load the shared version. Please retry.", "db_error");
+    if (publication?.snapshot) {
+      snapshot = { ...source, ...publication.snapshot };
+      alreadyPublished = true;
+    }
+  }
+  // Retrying a shared report must not silently refresh it from newer classroom data.
+  if (source.status !== "sent" && source.report_type === "daily") {
+    const daily = await toddlerSendSnapshot(ctx.supabase, source as DailyReportSnapshotSource);
+    if (daily) snapshot = { ...snapshot, ...daily };
+    const bundled = await refreshBundledSenSections(ctx.supabase, snapshot);
+    if (bundled) snapshot.sections = bundled;
+  }
+  const progress =
+    source.status === "sent" ? null : await termProgressSnapshot(ctx.supabase, snapshot);
+  if (progress) snapshot = { ...snapshot, ...progress };
+  const grades =
+    source.status === "sent" ? null : await elementaryGradeSnapshot(ctx.supabase, snapshot);
+  if (grades) snapshot = { ...snapshot, ...grades };
+  if (!alreadyPublished) {
+    const { data: room } = await ctx.supabase
+      .from("classrooms")
+      .select("school_id")
+      .eq("id", source.classroom_id)
+      .maybeSingle();
+    const { data: school } = room?.school_id
+      ? await ctx.supabase.from("schools").select("name").eq("id", room.school_id).maybeSingle()
+      : { data: null };
+    snapshot.school_name = school?.name ?? null;
+    const { data: student } = await ctx.supabase
+      .from("students")
+      .select("first_name, last_name, preferred_name")
+      .eq("id", source.student_id)
+      .maybeSingle();
+    snapshot.student_name = student
+      ? `${student.preferred_name || student.first_name} ${student.last_name || ""}`.trim()
+      : null;
+    const { data: template } = source.template_id
+      ? await ctx.supabase
+          .from("report_templates")
+          .select("logo_url")
+          .eq("id", source.template_id)
+          .eq("school_id", room?.school_id)
+          .maybeSingle()
+      : { data: null };
+    snapshot.template_logo_url = template?.logo_url ?? null;
+  }
+  const { data, error } = await ctx.supabase.rpc("publish_report", {
+    p_report_id: ctx.reportId,
+    p_actor_id: ctx.actorUserId,
+    p_expected_updated_at: source.updated_at ?? null,
+    p_snapshot: Object.fromEntries(
+      Object.entries(snapshot).filter(([key]) =>
+        [
+          "id",
+          "student_id",
+          "classroom_id",
+          "report_type",
+          "report_date",
+          "period_start",
+          "period_end",
+          "term_id",
+          "toddler_daily_log_id",
+          "title",
+          "body",
+          "sections",
+          "section_meta",
+          "template_id",
+          "template_logo_url",
+          "school_name",
+          "student_name",
+        ].includes(key)
+      )
+    ),
+    p_guardian_ids: [...new Set(guardianRefs)],
+    p_message_body: messageBody ?? null,
+  });
   if (error) throw new WorkflowError(error.message, "db_error");
+  return data as {
+    reportId: string;
+    publicationId: string;
+    queued: number;
+    alreadySent: number;
+    unchanged: boolean;
+  };
 }
 
 export async function editDraftBody(ctx: TransitionContext, body: string, title?: string) {

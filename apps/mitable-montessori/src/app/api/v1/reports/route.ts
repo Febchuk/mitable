@@ -1,3 +1,7 @@
+import {
+  buildConfiguredReportSections,
+  findClassroomReportTemplate,
+} from "@/lib/reports/configured-template";
 import { toddlerSendSnapshot } from "@/lib/reports/toddler-send-snapshot";
 import { buildTermHistorySections, mergeTermHistory } from "@/lib/reports/term-history";
 import { termSkillsSection } from "@/lib/reports/term-skills";
@@ -272,7 +276,48 @@ export async function POST(req: Request) {
     : { periodStart: reportDate, periodEnd: reportDate, termId: null };
 
   const reportClassroom = teacherClassrooms.find((classroom) => classroom.id === reportClassroomId);
+  let configuredLayout = false;
+  if (input.kind === "Major") {
+    const template =
+      useDefaultTemplate || !input.templateId
+        ? await findClassroomReportTemplate(
+            supabase,
+            auth.user.schoolId,
+            input.kind,
+            reportClassroom?.code
+          )
+        : (
+            await supabase
+              .from("report_templates")
+              .select("id, sections, section_meta, section_guidance")
+              .eq("id", input.templateId)
+              .eq("school_id", auth.user.schoolId)
+              .eq("kind", input.kind)
+              .eq("is_active", true)
+              .maybeSingle()
+          ).data;
+    if (template) {
+      const built = await buildConfiguredReportSections(supabase, template, {
+        schoolId: auth.user.schoolId,
+        classroomId: reportClassroomId,
+        studentId: input.childId,
+        periodStart,
+        periodEnd,
+        termId,
+        reportingPeriod: reportingPeriod ?? "end_of_term",
+        elementary: isElementaryClassroomCode(reportClassroom?.code),
+        kind: input.kind,
+      });
+      sections = built.sections;
+      sectionMeta = built.sectionMeta;
+      sectionGuidance = built.sectionGuidance;
+      resolvedTemplateId = template.id;
+      configuredLayout = true;
+    }
+  }
+
   if (
+    !configuredLayout &&
     reportingPeriod === "end_of_term" &&
     termId &&
     isElementaryClassroomCode(reportClassroom?.code)
@@ -283,10 +328,8 @@ export async function POST(req: Request) {
       studentId: input.childId,
       termId,
     };
-    const [gradeRows, feedback] = await Promise.all([
-      listStudentExamGradesForTerm(gradeScope),
-      getStudentTermGradeFeedback(gradeScope),
-    ]);
+    const gradeRows = await listStudentExamGradesForTerm(gradeScope);
+    const feedback = await getStudentTermGradeFeedback(gradeScope, gradeRows);
     const heading = "Exam grades";
     sections = [
       ...(sections ?? []).filter((section) => section.heading !== heading),
@@ -309,7 +352,7 @@ export async function POST(req: Request) {
     sectionMeta = { ...sectionMeta, [heading]: { type: "exam_grades", termId } };
   }
 
-  if (input.kind === "Major") {
+  if (input.kind === "Major" && !configuredLayout) {
     const built = await buildTermHistorySections(supabase, {
       schoolId: auth.user.schoolId,
       studentId: input.childId,
@@ -319,10 +362,7 @@ export async function POST(req: Request) {
     const merged = mergeTermHistory({ sections: sections ?? [], sectionMeta }, built);
     sections = merged.sections;
     sectionMeta = merged.sectionMeta;
-    if (
-      isElementaryClassroomCode(reportClassroom?.code) &&
-      !sections.some((section) => sectionMeta[section.heading]?.type === "term_skills")
-    ) {
+    if (!sections.some((section) => sectionMeta[section.heading]?.type === "term_skills")) {
       sections.push(termSkillsSection());
       sectionMeta["Skills report"] = { type: "term_skills" };
     }
@@ -414,11 +454,10 @@ export async function POST(req: Request) {
       title: `${firstName} — ${dayLabel}`,
       body: null,
       sections,
-      template_id: useDefaultTemplate
-        ? input.kind === "Incident"
+      template_id:
+        configuredLayout || !useDefaultTemplate || input.kind === "Incident"
           ? resolvedTemplateId
-          : null
-        : (input.templateId ?? null),
+          : null,
       section_meta: sectionMeta,
       section_guidance: sectionGuidance,
       created_by_user_id: auth.user.userId,

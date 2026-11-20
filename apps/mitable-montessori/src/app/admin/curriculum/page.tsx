@@ -15,7 +15,13 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/montessori/page-header";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   adminSplitDetailHeaderStyle,
@@ -120,6 +126,35 @@ const PROGRAM_CURRICULUM_TABS = [
 ] as const satisfies ReadonlyArray<{ id: AdminCurriculumTab; label: string }>;
 
 export default function AdminCurriculumPage() {
+  const [pendingRemoval, setPendingRemoval] = React.useState<{
+    name: string;
+    kind: string;
+    path: string;
+    body: Record<string, string>;
+    onSaved: () => void;
+  } | null>(null);
+  const [removing, setRemoving] = React.useState(false);
+  const confirmRemoval = async () => {
+    if (!pendingRemoval || removing) return;
+    setRemoving(true);
+    setDbActionError(null);
+    try {
+      const response = await fetch(pendingRemoval.path, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(pendingRemoval.body),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Could not remove this item");
+      pendingRemoval.onSaved();
+      setPendingRemoval(null);
+    } catch (error) {
+      setDbActionError(error instanceof Error ? error.message : "Could not remove this item");
+      setPendingRemoval(null);
+    } finally {
+      setRemoving(false);
+    }
+  };
   const programsEnabled = classroomProgramsEnabled();
   const [activeTab, setActiveTab] = React.useState<AdminCurriculumTab>("curricula");
   const [selectedDbId, setSelectedDbId] = React.useState("");
@@ -522,10 +557,19 @@ export default function AdminCurriculumPage() {
   };
 
   const removeSubject = (curriculumId: string, subjectId: string) => {
-    updateCurriculum(curriculumId, (curriculum) => ({
-      ...curriculum,
-      subjects: curriculum.subjects.filter((subject) => subject.id !== subjectId),
-    }));
+    const subject = selectedTree?.subjects.find((item) => item.id === subjectId);
+    if (!subject) return;
+    setPendingRemoval({
+      name: subject.name,
+      kind: "subject and its topics and lessons",
+      path: "/api/admin/curriculum-subjects",
+      body: { subject_id: subjectId },
+      onSaved: () =>
+        updateCurriculum(curriculumId, (current) => ({
+          ...current,
+          subjects: current.subjects.filter((item) => item.id !== subjectId),
+        })),
+    });
   };
 
   const renameSubject = async (curriculumId: string, subjectId: string, name: string) => {
@@ -600,10 +644,21 @@ export default function AdminCurriculumPage() {
   };
 
   const removeTopic = (curriculumId: string, subjectId: string, topicId: string) => {
-    updateSubject(curriculumId, subjectId, (subject) => ({
-      ...subject,
-      topics: subject.topics.filter((topic) => topic.id !== topicId),
-    }));
+    const topic = selectedTree?.subjects
+      .find((item) => item.id === subjectId)
+      ?.topics.find((item) => item.id === topicId);
+    if (!topic) return;
+    setPendingRemoval({
+      name: topic.name,
+      kind: "topic and its lessons",
+      path: "/api/admin/curriculum-topics",
+      body: { topic_id: topicId },
+      onSaved: () =>
+        updateSubject(curriculumId, subjectId, (current) => ({
+          ...current,
+          topics: current.topics.filter((item) => item.id !== topicId),
+        })),
+    });
   };
 
   const renameTopic = async (
@@ -681,10 +736,22 @@ export default function AdminCurriculumPage() {
     topicId: string,
     subtopicId: string
   ) => {
-    updateTopic(curriculumId, subjectId, topicId, (topic) => ({
-      ...topic,
-      subtopics: topic.subtopics.filter((subtopic) => subtopic.id !== subtopicId),
-    }));
+    const lesson = selectedTree?.subjects
+      .find((item) => item.id === subjectId)
+      ?.topics.find((item) => item.id === topicId)
+      ?.subtopics.find((item) => item.id === subtopicId);
+    if (!lesson) return;
+    setPendingRemoval({
+      name: lesson.name,
+      kind: "lesson",
+      path: "/api/admin/curriculum-subtopics",
+      body: { subtopic_id: subtopicId },
+      onSaved: () =>
+        updateTopic(curriculumId, subjectId, topicId, (current) => ({
+          ...current,
+          subtopics: current.subtopics.filter((item) => item.id !== subtopicId),
+        })),
+    });
   };
 
   const renameSubtopic = async (
@@ -745,6 +812,30 @@ export default function AdminCurriculumPage() {
 
   return (
     <div style={adminSplitPageStyle}>
+      <Dialog
+        open={!!pendingRemoval}
+        onOpenChange={(open) => {
+          if (!open && !removing) setPendingRemoval(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove {pendingRemoval?.name}?</DialogTitle>
+            <DialogDescription>
+              This {pendingRemoval?.kind} will be removed from the curriculum. Previously recorded
+              student progress and sent reports will be kept.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={removing} onClick={() => setPendingRemoval(null)}>
+              Cancel
+            </Button>
+            <Button disabled={removing} onClick={() => void confirmRemoval()}>
+              {removing ? "Removing…" : "Remove"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div style={{ flexShrink: 0 }}>
         <PageHeader
           title="Curriculum"
